@@ -191,6 +191,10 @@
   .pdf-loading { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); padding: 16px 0; }
   .pdf-edit-btn { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 4px; font-size: 11px; color: var(--text-muted); border: 1px solid var(--border); background: var(--bg); cursor: pointer; transition: all 0.1s; margin-left: 4px; }
   .pdf-edit-btn:hover { color: var(--primary); border-color: var(--primary); background: var(--primary-light); }
+  .ann-tool-btn { display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-muted); font-size: 12px; cursor: pointer; transition: all 0.1s; font-family: inherit; }
+  .ann-tool-btn:hover { border-color: var(--primary); color: var(--primary); }
+  .ann-tool-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+  .ann-tool-btn[data-tool="redact"].active { background: #1a1a1a; border-color: #1a1a1a; }
 
   /* ── Forms ── */
   .form-group { margin-bottom: 14px; }
@@ -843,22 +847,133 @@
         </div>
       </div>
 
+      <!-- Watermark section (collapsible) -->
+      <details id="pdf-watermark-details" style="border-top:1px solid var(--border)">
+        <summary style="padding:12px 16px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;list-style:none;display:flex;align-items:center;gap:7px;user-select:none">
+          <i class="fa fa-chevron-right" id="pdf-wm-chevron" style="font-size:10px;transition:transform 0.15s"></i>
+          Add watermark / stamp
+          <span style="font-weight:400;color:var(--text-light)">(applies to all pages)</span>
+        </summary>
+        <div style="padding:0 16px 16px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
+          <div class="form-group" style="flex:1;min-width:140px;margin:0">
+            <label>Text</label>
+            <input type="text" id="wm-text" value="DRAFT" placeholder="e.g. DRAFT, DO NOT SHARE">
+          </div>
+          <div class="form-group" style="flex:0 0 80px;margin:0">
+            <label>Colour</label>
+            <input type="color" id="wm-colour" value="#cc0000" style="width:100%;height:34px;padding:2px 4px;cursor:pointer">
+          </div>
+          <div class="form-group" style="flex:0 0 120px;margin:0">
+            <label>Opacity <span id="wm-opacity-val" style="font-weight:400;color:var(--text-light)">25%</span></label>
+            <input type="range" id="wm-opacity" min="5" max="100" value="25" style="width:100%" oninput="document.getElementById('wm-opacity-val').textContent=this.value+'%'">
+          </div>
+          <div class="form-group" style="flex:0 0 100px;margin:0">
+            <label>Size (pt)</label>
+            <input type="number" id="wm-size" value="60" min="10" max="200">
+          </div>
+          <div class="form-group" style="flex:0 0 110px;margin:0">
+            <label>Angle</label>
+            <select id="wm-angle" style="font-size:12px">
+              <option value="45">Diagonal (45°)</option>
+              <option value="0">Horizontal (0°)</option>
+              <option value="-45">Diagonal (-45°)</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="btn-wm-apply" onclick="applyWatermark()" style="margin-bottom:1px"><i class="fa fa-stamp"></i> Apply</button>
+        </div>
+      </details>
+
       <!-- Save row -->
-      <div style="padding:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <span style="font-size:12px;font-weight:600;color:var(--text-muted);white-space:nowrap">Save as:</span>
+      <div style="padding:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--border)">
+        <button class="btn" id="btn-open-annotate" onclick="openAnnotateFromEditor()" style="margin-right:auto">
+          <i class="fa fa-pen-ruler"></i> Annotate
+        </button>
+        <span style="font-size:12px;font-weight:600;color:var(--text-muted);white-space:nowrap">Save pages as:</span>
         <select id="pdf-save-mode" style="font-size:12px;flex:0 0 auto" onchange="pdfSaveModeChanged()">
           <option value="overwrite-a">Overwrite Source A</option>
           <option value="overwrite-b">Overwrite Source B</option>
           <option value="new">Save as new file</option>
         </select>
         <input type="text" id="pdf-save-path" placeholder="e.g. chemistry/national5/2023_paper_clean.pdf" style="flex:1;min-width:200px;font-size:12px;display:none">
-        <div style="margin-left:auto;display:flex;gap:8px">
+        <div style="display:flex;gap:8px">
           <button class="btn" onclick="closeModal('modal-pdf-editor')">Cancel</button>
           <button class="btn btn-primary" id="btn-pdf-save" onclick="savePdfEdit()"><i class="fa fa-save"></i> Save PDF</button>
         </div>
       </div>
 
     </div>
+  </div>
+</div>
+
+<!-- ── PDF Annotation Modal ───────────────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-pdf-annotate" style="display:none" onclick="closeModalOutside(event,'modal-pdf-annotate')">
+  <div class="modal" style="width:960px;max-width:99vw;max-height:96vh;display:flex;flex-direction:column">
+    <div class="modal-header" style="flex-shrink:0">
+      <h3><i class="fa fa-pen-ruler" style="margin-right:7px;color:var(--primary)"></i>Annotate PDF
+        <span id="ann-filename" style="font-size:12px;font-weight:400;color:var(--text-muted);margin-left:8px"></span>
+      </h3>
+      <button class="icon-btn" onclick="closeModal('modal-pdf-annotate')"><i class="fa fa-times"></i></button>
+    </div>
+
+    <div style="display:flex;flex:1;overflow:hidden;min-height:0">
+
+      <!-- Tool palette -->
+      <div style="width:130px;min-width:130px;border-right:1px solid var(--border);padding:14px 10px;display:flex;flex-direction:column;gap:8px;background:var(--bg);overflow-y:auto">
+        <p style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin-bottom:2px">Tools</p>
+        <button class="ann-tool-btn active" data-tool="rect"   onclick="setAnnTool('rect')"  ><i class="fa fa-vector-square"></i> Rectangle</button>
+        <button class="ann-tool-btn"        data-tool="arrow"  onclick="setAnnTool('arrow')" ><i class="fa fa-arrow-right"></i> Arrow</button>
+        <button class="ann-tool-btn"        data-tool="text"   onclick="setAnnTool('text')"  ><i class="fa fa-font"></i> Text</button>
+        <button class="ann-tool-btn"        data-tool="redact" onclick="setAnnTool('redact')"><i class="fa fa-eraser"></i> Redact</button>
+
+        <hr style="border:none;border-top:1px solid var(--border);margin:4px 0">
+
+        <p style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin-bottom:2px">Style</p>
+        <div>
+          <label style="font-size:11px;color:var(--text-muted)">Colour</label>
+          <input type="color" id="ann-colour" value="#e63946" style="width:100%;height:30px;padding:2px 3px;cursor:pointer;border-radius:4px;border:1px solid var(--border)">
+        </div>
+        <div id="ann-thickness-row">
+          <label style="font-size:11px;color:var(--text-muted)">Thickness <span id="ann-thick-val">2</span>px</label>
+          <input type="range" id="ann-thickness" min="1" max="10" value="2" style="width:100%" oninput="document.getElementById('ann-thick-val').textContent=this.value">
+        </div>
+        <div id="ann-fontsize-row" style="display:none">
+          <label style="font-size:11px;color:var(--text-muted)">Font size</label>
+          <input type="number" id="ann-fontsize" value="14" min="6" max="72" style="width:100%">
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--border);margin:4px 0">
+
+        <button class="btn btn-sm" onclick="undoAnnotation()" style="width:100%"><i class="fa fa-undo"></i> Undo</button>
+        <button class="btn btn-sm" onclick="clearPageAnnotations()" style="width:100%;color:var(--danger)"><i class="fa fa-trash"></i> Clear page</button>
+      </div>
+
+      <!-- Canvas area -->
+      <div style="flex:1;overflow:auto;background:#666;display:flex;align-items:flex-start;justify-content:center;padding:16px">
+        <div id="ann-canvas-wrap" style="position:relative;display:inline-block;box-shadow:0 4px 20px rgba(0,0,0,0.4)">
+          <img id="ann-page-img" style="display:block;max-width:100%" alt="">
+          <canvas id="ann-canvas" style="position:absolute;top:0;left:0;cursor:crosshair"></canvas>
+          <div id="ann-text-input-wrap" style="display:none;position:absolute">
+            <input id="ann-text-input" type="text" placeholder="Type annotation…"
+                   style="border:2px solid var(--primary);border-radius:3px;padding:2px 6px;font-size:14px;background:rgba(255,255,255,0.95);min-width:140px;outline:none"
+                   onkeydown="if(event.key==='Enter')commitTextAnnotation();if(event.key==='Escape')cancelTextAnnotation()">
+          </div>
+        </div>
+        <div id="ann-page-loading" style="color:white;font-size:13px;padding:40px;display:none"><div class="spinner"></div> Loading page…</div>
+      </div>
+    </div>
+
+    <!-- Footer: page nav + save -->
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;background:var(--surface)">
+      <button class="btn btn-sm" id="ann-prev" onclick="annChangePage(-1)"><i class="fa fa-chevron-left"></i></button>
+      <span id="ann-page-label" style="font-size:12px;color:var(--text-muted);min-width:80px;text-align:center">Page 1 / 1</span>
+      <button class="btn btn-sm" id="ann-next" onclick="annChangePage(1)"><i class="fa fa-chevron-right"></i></button>
+      <span style="font-size:11px;color:var(--text-light);margin-left:4px" id="ann-dirty-label"></span>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn" onclick="closeModal('modal-pdf-annotate')">Cancel</button>
+        <button class="btn btn-primary" id="btn-ann-save" onclick="saveAnnotations()"><i class="fa fa-save"></i> Burn annotations</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -3061,6 +3176,322 @@ async function savePdfEdit() {
     pdfState.allPdfs = null; // refresh file list next open
     closeModal('modal-pdf-editor');
   }
+}
+
+// ── Watermark ──────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const det = document.getElementById('pdf-watermark-details');
+  if (det) det.addEventListener('toggle', () => {
+    const ch = document.getElementById('pdf-wm-chevron');
+    if (ch) ch.style.transform = det.open ? 'rotate(90deg)' : '';
+  });
+});
+
+async function applyWatermark() {
+  const path = pdfState.sources.a?.path;
+  if (!path) { notify('Load a PDF in Source A first', 'warning'); return; }
+
+  const text = document.getElementById('wm-text').value.trim();
+  if (!text) { notify('Enter watermark text', 'warning'); return; }
+
+  const btn = document.getElementById('btn-wm-apply');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Applying…';
+
+  const res = await fetch('/api/pdf/watermark', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      path,
+      text,
+      colour:   document.getElementById('wm-colour').value,
+      opacity:  parseInt(document.getElementById('wm-opacity').value) / 100,
+      fontSize: parseInt(document.getElementById('wm-size').value),
+      angle:    parseInt(document.getElementById('wm-angle').value),
+    }),
+  });
+  const data = await res.json();
+  btn.disabled = false; btn.innerHTML = '<i class="fa fa-stamp"></i> Apply';
+
+  if (data.error) { notify('Error: ' + data.error, 'error'); return; }
+  notify('Watermark applied!', 'success');
+  // Reload thumbnails so the preview reflects the change
+  await loadPdfSource('a');
+}
+
+function openAnnotateFromEditor() {
+  const path = pdfState.sources.a?.path;
+  if (!path) { notify('Load a PDF in Source A first', 'warning'); return; }
+  openAnnotateModal(path);
+}
+
+// ── Annotation modal ───────────────────────────────────────────────────────
+const annState = {
+  path:        null,
+  page:        0,
+  pageCount:   1,
+  scale:       1.5,
+  tool:        'rect',
+  allAnnots:   {},   // { "0": [...], "1": [...] }
+  drawing:     false,
+  startX:      0,
+  startY:      0,
+  pendingText: null, // { x, y } while text input is open
+};
+
+async function openAnnotateModal(path) {
+  annState.path      = path;
+  annState.page      = 0;
+  annState.allAnnots = {};
+  annState.drawing   = false;
+
+  const name = path.split('/').pop();
+  document.getElementById('ann-filename').textContent = name;
+  document.getElementById('ann-dirty-label').textContent = '';
+
+  openModal('modal-pdf-annotate');
+  await annLoadPage(0);
+  annBindCanvas();
+}
+
+async function annLoadPage(num) {
+  const img     = document.getElementById('ann-page-img');
+  const loading = document.getElementById('ann-page-loading');
+  const canvas  = document.getElementById('ann-canvas');
+
+  img.style.display     = 'none';
+  canvas.style.display  = 'none';
+  loading.style.display = 'flex';
+
+  const res  = await fetch(`/api/pdf/page?path=${encodeURIComponent(annState.path)}&page=${num}&scale=${annState.scale}`);
+  const data = await res.json();
+  if (data.error) { notify(data.error, 'error'); loading.style.display = 'none'; return; }
+
+  annState.pageCount = data.pageCount;
+  annState.page      = num;
+
+  img.onload = () => {
+    loading.style.display = 'none';
+    img.style.display     = 'block';
+    // Size canvas to match the image's rendered size
+    canvas.width          = img.naturalWidth;
+    canvas.height         = img.naturalHeight;
+    canvas.style.width    = img.offsetWidth  + 'px';
+    canvas.style.height   = img.offsetHeight + 'px';
+    canvas.style.display  = 'block';
+    annRedrawCanvas();
+  };
+  img.src = data.image;
+
+  document.getElementById('ann-page-label').textContent = `Page ${num + 1} / ${data.pageCount}`;
+  document.getElementById('ann-prev').disabled = num === 0;
+  document.getElementById('ann-next').disabled = num === data.pageCount - 1;
+}
+
+function annChangePage(dir) {
+  const next = annState.page + dir;
+  if (next < 0 || next >= annState.pageCount) return;
+  cancelTextAnnotation();
+  annLoadPage(next);
+}
+
+function setAnnTool(tool) {
+  annState.tool = tool;
+  document.querySelectorAll('.ann-tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+  const canvas = document.getElementById('ann-canvas');
+  canvas.style.cursor = tool === 'text' ? 'text' : 'crosshair';
+  document.getElementById('ann-thickness-row').style.display = tool === 'text'   ? 'none'  : '';
+  document.getElementById('ann-fontsize-row').style.display  = tool === 'text'   ? ''      : 'none';
+}
+
+function annCurrentAnnots() {
+  const key = String(annState.page);
+  if (!annState.allAnnots[key]) annState.allAnnots[key] = [];
+  return annState.allAnnots[key];
+}
+
+function undoAnnotation() {
+  annCurrentAnnots().pop();
+  annRedrawCanvas();
+  annUpdateDirtyLabel();
+}
+
+function clearPageAnnotations() {
+  annState.allAnnots[String(annState.page)] = [];
+  annRedrawCanvas();
+  annUpdateDirtyLabel();
+}
+
+function annUpdateDirtyLabel() {
+  const total = Object.values(annState.allAnnots).reduce((s, a) => s + a.length, 0);
+  document.getElementById('ann-dirty-label').textContent = total > 0 ? `${total} annotation${total > 1 ? 's' : ''} pending` : '';
+}
+
+function annBindCanvas() {
+  const canvas = document.getElementById('ann-canvas');
+  // Remove old listeners by cloning
+  const fresh = canvas.cloneNode(true);
+  canvas.parentNode.replaceChild(fresh, canvas);
+  fresh.id = 'ann-canvas';
+
+  fresh.addEventListener('mousedown', e => {
+    if (annState.tool === 'text') return; // handled by click
+    annState.drawing = true;
+    const {x, y} = annCanvasPos(e, fresh);
+    annState.startX = x; annState.startY = y;
+  });
+
+  fresh.addEventListener('mousemove', e => {
+    if (!annState.drawing) return;
+    const {x, y} = annCanvasPos(e, fresh);
+    annRedrawCanvas();
+    annDrawLive(fresh.getContext('2d'), annState.startX, annState.startY, x, y);
+  });
+
+  fresh.addEventListener('mouseup', e => {
+    if (!annState.drawing) return;
+    annState.drawing = false;
+    const {x, y} = annCanvasPos(e, fresh);
+    const colour    = document.getElementById('ann-colour').value;
+    const thickness = parseInt(document.getElementById('ann-thickness').value);
+    const dx = Math.abs(x - annState.startX);
+    const dy = Math.abs(y - annState.startY);
+    if (dx < 3 && dy < 3) return; // ignore tiny accidental clicks
+    annCurrentAnnots().push({ type: annState.tool, colour, thickness,
+      x1: annState.startX, y1: annState.startY, x2: x, y2: y });
+    annRedrawCanvas();
+    annUpdateDirtyLabel();
+  });
+
+  fresh.addEventListener('click', e => {
+    if (annState.tool !== 'text') return;
+    const {x, y} = annCanvasPos(e, fresh);
+    openTextInput(x, y, fresh);
+  });
+
+  // Resize canvas if image resizes
+  window.addEventListener('resize', () => {
+    const img = document.getElementById('ann-page-img');
+    fresh.style.width  = img.offsetWidth  + 'px';
+    fresh.style.height = img.offsetHeight + 'px';
+  });
+}
+
+function annCanvasPos(e, canvas) {
+  const rect  = canvas.getBoundingClientRect();
+  const scaleX = canvas.width  / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+}
+
+function annRedrawCanvas() {
+  const canvas = document.getElementById('ann-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (const ann of annCurrentAnnots()) {
+    annDrawAnnot(ctx, ann);
+  }
+}
+
+function annDrawLive(ctx, x1, y1, x2, y2) {
+  const colour    = document.getElementById('ann-colour').value;
+  const thickness = parseInt(document.getElementById('ann-thickness').value);
+  annDrawAnnot(ctx, { type: annState.tool, colour, thickness, x1, y1, x2, y2 });
+}
+
+function annDrawAnnot(ctx, ann) {
+  ctx.strokeStyle = ann.colour || '#e63946';
+  ctx.fillStyle   = ann.colour || '#e63946';
+  ctx.lineWidth   = ann.thickness || 2;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+
+  if (ann.type === 'rect') {
+    ctx.strokeRect(ann.x1, ann.y1, ann.x2 - ann.x1, ann.y2 - ann.y1);
+
+  } else if (ann.type === 'arrow') {
+    ctx.beginPath();
+    ctx.moveTo(ann.x1, ann.y1);
+    ctx.lineTo(ann.x2, ann.y2);
+    ctx.stroke();
+    // Arrowhead
+    const angle  = Math.atan2(ann.y2 - ann.y1, ann.x2 - ann.x1);
+    const head   = 14;
+    const spread = 0.45;
+    ctx.beginPath();
+    ctx.moveTo(ann.x2, ann.y2);
+    ctx.lineTo(ann.x2 - head * Math.cos(angle - spread), ann.y2 - head * Math.sin(angle - spread));
+    ctx.moveTo(ann.x2, ann.y2);
+    ctx.lineTo(ann.x2 - head * Math.cos(angle + spread), ann.y2 - head * Math.sin(angle + spread));
+    ctx.stroke();
+
+  } else if (ann.type === 'text' && ann.text) {
+    ctx.font      = `${ann.fontSize || 14}px Inter, sans-serif`;
+    ctx.fillStyle = ann.colour || '#e63946';
+    ctx.fillText(ann.text, ann.x, ann.y);
+
+  } else if (ann.type === 'redact') {
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(ann.x1, ann.y1, ann.x2 - ann.x1, ann.y2 - ann.y1);
+  }
+}
+
+function openTextInput(x, y, canvas) {
+  cancelTextAnnotation();
+  annState.pendingText = { x, y };
+  const wrap  = document.getElementById('ann-text-input-wrap');
+  const input = document.getElementById('ann-text-input');
+  // Position the input overlay at the click point (in CSS px, accounting for canvas scaling)
+  const rect   = canvas.getBoundingClientRect();
+  const cssX   = x * (rect.width  / canvas.width);
+  const cssY   = y * (rect.height / canvas.height);
+  wrap.style.left    = cssX + 'px';
+  wrap.style.top     = (cssY - 20) + 'px';
+  wrap.style.display = 'block';
+  input.value        = '';
+  input.focus();
+}
+
+function commitTextAnnotation() {
+  const input   = document.getElementById('ann-text-input');
+  const text    = input.value.trim();
+  const colour  = document.getElementById('ann-colour').value;
+  const fontSize = parseInt(document.getElementById('ann-fontsize').value) || 14;
+  if (text && annState.pendingText) {
+    annCurrentAnnots().push({ type: 'text', text, colour, fontSize,
+      x: annState.pendingText.x, y: annState.pendingText.y });
+    annRedrawCanvas();
+    annUpdateDirtyLabel();
+  }
+  cancelTextAnnotation();
+}
+
+function cancelTextAnnotation() {
+  annState.pendingText = null;
+  document.getElementById('ann-text-input-wrap').style.display = 'none';
+  document.getElementById('ann-text-input').value = '';
+}
+
+async function saveAnnotations() {
+  const total = Object.values(annState.allAnnots).reduce((s, a) => s + a.length, 0);
+  if (total === 0) { notify('No annotations to save', 'warning'); return; }
+
+  const btn = document.getElementById('btn-ann-save');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Burning…';
+
+  const res = await fetch('/api/pdf/annotate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: annState.path, scale: annState.scale, pages: annState.allAnnots }),
+  });
+  const data = await res.json();
+  btn.disabled = false; btn.innerHTML = '<i class="fa fa-save"></i> Burn annotations';
+
+  if (data.error) { notify('Error: ' + data.error, 'error'); return; }
+  notify('Annotations burned into PDF!', 'success');
+  annState.allAnnots = {};
+  annUpdateDirtyLabel();
+  closeModal('modal-pdf-annotate');
+  // Refresh thumbnails in editor if the same file is loaded
+  if (pdfState.sources.a?.path === annState.path) await loadPdfSource('a');
 }
 
 boot();

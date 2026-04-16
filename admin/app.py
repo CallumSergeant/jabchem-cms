@@ -6,6 +6,7 @@ import socket
 import sys
 import tempfile
 import base64
+import math
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, request, jsonify, render_template, send_from_directory
@@ -946,6 +947,176 @@ def pdf_save():
         result_doc.save(str(output_path), garbage=4, deflate=True)
         result_doc.close()
         return jsonify({'status': 'ok', 'pages': page_count, 'path': '/files/' + output_rel})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/pdf/page', methods=['GET'])
+def pdf_page_render():
+    """Render a single page at full resolution for annotation."""
+    rel_path = request.args.get('path', '')
+    page_num  = int(request.args.get('page', 0))
+    scale     = min(max(float(request.args.get('scale', 1.5)), 0.5), 3.0)
+
+    p = _resolve_pdf_path(rel_path)
+    if not p or not p.exists():
+        return jsonify({'error': 'File not found'}), 404
+
+    try:
+        doc = fitz.open(str(p))
+        page_count = len(doc)
+        if page_num >= page_count:
+            doc.close()
+            return jsonify({'error': 'Page out of range'}), 400
+
+        page = doc[page_num]
+        mat  = fitz.Matrix(scale, scale)
+        pix  = page.get_pixmap(matrix=mat)
+        img  = 'data:image/jpeg;base64,' + base64.b64encode(
+            pix.tobytes('jpeg', jpg_quality=92)
+        ).decode()
+        w, h = pix.width, pix.height
+        doc.close()
+        return jsonify({'image': img, 'width': w, 'height': h,
+                        'pageCount': page_count, 'scale': scale})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/pdf/watermark', methods=['POST'])
+def pdf_watermark():
+    """Stamp text watermark across every page of a PDF."""
+    data       = request.json or {}
+    path_rel   = data.get('path', '')
+    text       = (data.get('text') or '').strip()
+    colour_hex = (data.get('colour') or '#cc0000').lstrip('#')
+    opacity    = max(0.05, min(1.0, float(data.get('opacity', 0.25))))
+    font_size  = max(10,  min(200, int(data.get('fontSize', 60))))
+    angle      = int(data.get('angle', 45))
+
+    if not text:
+        return jsonify({'error': 'text is required'}), 400
+
+    p = _resolve_pdf_path(path_rel)
+    if not p or not p.exists():
+        return jsonify({'error': 'File not found'}), 404
+
+    try:
+        r = int(colour_hex[0:2], 16) / 255
+        g = int(colour_hex[2:4], 16) / 255
+        b = int(colour_hex[4:6], 16) / 255
+    except (ValueError, IndexError):
+        r, g, b = 0.8, 0.0, 0.0
+
+    try:
+        doc = fitz.open(str(p))
+        cos_a = math.cos(math.radians(angle))
+        sin_a = math.sin(math.radians(angle))
+        rot   = fitz.Matrix(cos_a, sin_a, -sin_a, cos_a, 0, 0)
+
+        for page in doc:
+            rect  = page.rect
+            pivot = fitz.Point(rect.width / 2, rect.height / 2)
+            page.insert_text(
+                pivot, text,
+                fontsize=font_size,
+                color=(r, g, b),
+                fill_opacity=opacity,
+                morph=(pivot, rot),
+                overlay=True,
+            )
+
+        doc.save(str(p), garbage=4, deflate=True)
+        doc.close()
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/pdf/annotate', methods=['POST'])
+def pdf_annotate():
+    """
+    Burn shape/text/redact annotations into specific pages of a PDF.
+    Body: { path, scale, pages: { "0": [annots], "1": [annots] } }
+    Each annot: { type:'rect'|'arrow'|'text'|'redact', colour, thickness,
+                  x1,y1,x2,y2  OR  x,y,text,fontSize }
+    Coordinates are in rendered-image pixels; divide by scale for PDF points.
+    """
+    data     = request.json or {}
+    path_rel = data.get('path', '')
+    scale    = float(data.get('scale', 1.5))
+    pages    = data.get('pages', {})
+
+    p = _resolve_pdf_path(path_rel)
+    if not p or not p.exists():
+        return jsonify({'error': 'File not found'}), 404
+    if not pages:
+        return jsonify({'error': 'No annotations provided'}), 400
+
+    def hex_to_rgb(h):
+        h = (h or '#ff0000').lstrip('#')
+        return (int(h[0:2],16)/255, int(h[2:4],16)/255, int(h[4:6],16)/255)
+
+    try:
+        doc = fitz.open(str(p))
+
+        for page_str, annots in pages.items():
+            page_num = int(page_str)
+            if page_num >= len(doc):
+                continue
+            page    = doc[page_num]
+            redacts = []
+
+            for ann in annots:
+                t         = ann.get('type')
+                colour    = hex_to_rgb(ann.get('colour', '#ff0000'))
+                thickness = max(1, int(ann.get('thickness', 2)))
+
+                if t == 'rect':
+                    r = fitz.Rect(ann['x1']/scale, ann['y1']/scale,
+                                  ann['x2']/scale, ann['y2']/scale)
+                    page.draw_rect(r, color=colour, width=thickness)
+
+                elif t == 'arrow':
+                    p1 = fitz.Point(ann['x1']/scale, ann['y1']/scale)
+                    p2 = fitz.Point(ann['x2']/scale, ann['y2']/scale)
+                    page.draw_line(p1, p2, color=colour, width=thickness)
+                    # Arrowhead
+                    dx = p2.x - p1.x
+                    dy = p2.y - p1.y
+                    length = math.sqrt(dx*dx + dy*dy)
+                    if length > 0:
+                        dx /= length; dy /= length
+                        head = 8
+                        ang  = 0.45
+                        for sign in (1, -1):
+                            tip = fitz.Point(
+                                p2.x - head*(dx*math.cos(ang) + sign*dy*math.sin(ang)),
+                                p2.y - head*(dy*math.cos(ang) - sign*dx*math.sin(ang))
+                            )
+                            page.draw_line(p2, tip, color=colour, width=thickness)
+
+                elif t == 'text':
+                    page.insert_text(
+                        fitz.Point(ann['x']/scale, ann['y']/scale),
+                        ann.get('text', ''),
+                        fontsize=max(6, int(ann.get('fontSize', 12))),
+                        color=colour,
+                        overlay=True,
+                    )
+
+                elif t == 'redact':
+                    r = fitz.Rect(ann['x1']/scale, ann['y1']/scale,
+                                  ann['x2']/scale, ann['y2']/scale)
+                    page.add_redact_annot(r, fill=(0, 0, 0))
+                    redacts.append(r)
+
+            if redacts:
+                page.apply_redactions()
+
+        doc.save(str(p), garbage=4, deflate=True)
+        doc.close()
+        return jsonify({'status': 'ok'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
