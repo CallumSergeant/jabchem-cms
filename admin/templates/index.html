@@ -3247,43 +3247,57 @@ async function openAnnotateModal(path) {
   document.getElementById('ann-filename').textContent = name;
   document.getElementById('ann-dirty-label').textContent = '';
 
+  // Reset bound flag so listeners are re-attached on fresh open
+  const canvas = document.getElementById('ann-canvas');
+  delete canvas.dataset.bound;
+
   openModal('modal-pdf-annotate');
-  await annLoadPage(0);
+  await annLoadPage(0);  // truly waits for image to load and canvas to be sized
   annBindCanvas();
 }
 
-async function annLoadPage(num) {
-  const img     = document.getElementById('ann-page-img');
-  const loading = document.getElementById('ann-page-loading');
-  const canvas  = document.getElementById('ann-canvas');
+function annLoadPage(num) {
+  return new Promise(async (resolve) => {
+    const img     = document.getElementById('ann-page-img');
+    const loading = document.getElementById('ann-page-loading');
 
-  img.style.display     = 'none';
-  canvas.style.display  = 'none';
-  loading.style.display = 'flex';
+    img.style.display     = 'none';
+    loading.style.display = 'flex';
+    // Hide canvas while loading but don't reset its size yet
+    const canvas = document.getElementById('ann-canvas');
+    canvas.style.display = 'none';
 
-  const res  = await fetch(`/api/pdf/page?path=${encodeURIComponent(annState.path)}&page=${num}&scale=${annState.scale}`);
-  const data = await res.json();
-  if (data.error) { notify(data.error, 'error'); loading.style.display = 'none'; return; }
+    const res  = await fetch(`/api/pdf/page?path=${encodeURIComponent(annState.path)}&page=${num}&scale=${annState.scale}`);
+    const data = await res.json();
+    if (data.error) {
+      notify(data.error, 'error');
+      loading.style.display = 'none';
+      resolve();
+      return;
+    }
 
-  annState.pageCount = data.pageCount;
-  annState.page      = num;
+    annState.pageCount = data.pageCount;
+    annState.page      = num;
 
-  img.onload = () => {
-    loading.style.display = 'none';
-    img.style.display     = 'block';
-    // Size canvas to match the image's rendered size
-    canvas.width          = img.naturalWidth;
-    canvas.height         = img.naturalHeight;
-    canvas.style.width    = img.offsetWidth  + 'px';
-    canvas.style.height   = img.offsetHeight + 'px';
-    canvas.style.display  = 'block';
-    annRedrawCanvas();
-  };
-  img.src = data.image;
+    img.onload = () => {
+      loading.style.display = 'none';
+      img.style.display     = 'block';
+      // Always look up canvas fresh — avoids stale reference after any DOM changes
+      const c       = document.getElementById('ann-canvas');
+      c.width       = img.naturalWidth;
+      c.height      = img.naturalHeight;
+      c.style.width  = img.offsetWidth  + 'px';
+      c.style.height = img.offsetHeight + 'px';
+      c.style.display = 'block';
+      annRedrawCanvas();
+      resolve();
+    };
+    img.src = data.image;
 
-  document.getElementById('ann-page-label').textContent = `Page ${num + 1} / ${data.pageCount}`;
-  document.getElementById('ann-prev').disabled = num === 0;
-  document.getElementById('ann-next').disabled = num === data.pageCount - 1;
+    document.getElementById('ann-page-label').textContent = `Page ${num + 1} / ${data.pageCount}`;
+    document.getElementById('ann-prev').disabled = num === 0;
+    document.getElementById('ann-next').disabled = num === data.pageCount - 1;
+  });
 }
 
 function annChangePage(dir) {
@@ -3327,58 +3341,72 @@ function annUpdateDirtyLabel() {
 
 function annBindCanvas() {
   const canvas = document.getElementById('ann-canvas');
-  // Remove old listeners by cloning
-  const fresh = canvas.cloneNode(true);
-  canvas.parentNode.replaceChild(fresh, canvas);
-  fresh.id = 'ann-canvas';
+  if (canvas.dataset.bound) return; // already bound — don't double-attach
+  canvas.dataset.bound = '1';
 
-  fresh.addEventListener('mousedown', e => {
-    if (annState.tool === 'text') return; // handled by click
+  // All handlers look up the canvas live so they're never stale
+  function getCanvas() { return document.getElementById('ann-canvas'); }
+
+  canvas.addEventListener('mousedown', e => {
+    if (annState.tool === 'text') return;
     annState.drawing = true;
-    const {x, y} = annCanvasPos(e, fresh);
+    const {x, y} = annCanvasPos(e, getCanvas());
     annState.startX = x; annState.startY = y;
   });
 
-  fresh.addEventListener('mousemove', e => {
+  canvas.addEventListener('mousemove', e => {
     if (!annState.drawing) return;
-    const {x, y} = annCanvasPos(e, fresh);
+    const c = getCanvas();
+    const {x, y} = annCanvasPos(e, c);
     annRedrawCanvas();
-    annDrawLive(fresh.getContext('2d'), annState.startX, annState.startY, x, y);
+    annDrawLive(c.getContext('2d'), annState.startX, annState.startY, x, y);
   });
 
-  fresh.addEventListener('mouseup', e => {
+  canvas.addEventListener('mouseup', e => {
     if (!annState.drawing) return;
     annState.drawing = false;
-    const {x, y} = annCanvasPos(e, fresh);
+    const {x, y} = annCanvasPos(e, getCanvas());
     const colour    = document.getElementById('ann-colour').value;
     const thickness = parseInt(document.getElementById('ann-thickness').value);
     const dx = Math.abs(x - annState.startX);
     const dy = Math.abs(y - annState.startY);
-    if (dx < 3 && dy < 3) return; // ignore tiny accidental clicks
+    if (dx < 3 && dy < 3) return;
     annCurrentAnnots().push({ type: annState.tool, colour, thickness,
       x1: annState.startX, y1: annState.startY, x2: x, y2: y });
     annRedrawCanvas();
     annUpdateDirtyLabel();
   });
 
-  fresh.addEventListener('click', e => {
-    if (annState.tool !== 'text') return;
-    const {x, y} = annCanvasPos(e, fresh);
-    openTextInput(x, y, fresh);
+  canvas.addEventListener('mouseleave', () => {
+    // Cancel in-progress draw if mouse leaves the canvas
+    if (annState.drawing) {
+      annState.drawing = false;
+      annRedrawCanvas();
+    }
   });
 
-  // Resize canvas if image resizes
+  canvas.addEventListener('click', e => {
+    if (annState.tool !== 'text') return;
+    const {x, y} = annCanvasPos(e, getCanvas());
+    openTextInput(x, y, getCanvas());
+  });
+
   window.addEventListener('resize', () => {
     const img = document.getElementById('ann-page-img');
-    fresh.style.width  = img.offsetWidth  + 'px';
-    fresh.style.height = img.offsetHeight + 'px';
+    const c   = getCanvas();
+    if (img && c) {
+      c.style.width  = img.offsetWidth  + 'px';
+      c.style.height = img.offsetHeight + 'px';
+    }
   });
 }
 
 function annCanvasPos(e, canvas) {
-  const rect  = canvas.getBoundingClientRect();
-  const scaleX = canvas.width  / rect.width;
-  const scaleY = canvas.height / rect.height;
+  // canvas param kept for compatibility but we always resolve fresh
+  const c      = document.getElementById('ann-canvas');
+  const rect   = c.getBoundingClientRect();
+  const scaleX = c.width  / rect.width;
+  const scaleY = c.height / rect.height;
   return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
 }
 
