@@ -170,6 +170,28 @@
   .modal-body { padding: 20px; }
   .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
 
+  /* PDF Editor */
+  .pdf-thumb-grid { display: flex; flex-wrap: wrap; gap: 8px; max-height: 260px; overflow-y: auto; min-height: 48px; }
+  .pdf-thumb { position: relative; cursor: pointer; border-radius: 4px; border: 2px solid var(--border); overflow: hidden; flex-shrink: 0; transition: border-color 0.1s; }
+  .pdf-thumb img { display: block; width: 72px; height: auto; }
+  .pdf-thumb .thumb-num { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center; font-size: 9px; font-weight: 600; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+  .pdf-thumb .thumb-badge { position: absolute; top: 2px; right: 2px; font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 3px; }
+  .pdf-thumb.selected { border-color: var(--primary); }
+  .pdf-thumb.selected::after { content: '✓'; position: absolute; top: 2px; left: 2px; background: var(--primary); color: white; font-size: 9px; font-weight: 700; width: 14px; height: 14px; border-radius: 3px; display: flex; align-items: center; justify-content: center; }
+  .pdf-thumb.blank-page { opacity: 0.45; }
+  .pdf-thumb.blank-page .thumb-badge { background: #f59e0b; color: white; }
+  .pdf-result-strip { display: flex; flex-wrap: wrap; gap: 8px; min-height: 60px; padding: 4px 0; }
+  .pdf-result-thumb { position: relative; border-radius: 4px; border: 2px solid var(--primary); overflow: hidden; flex-shrink: 0; cursor: grab; }
+  .pdf-result-thumb img { display: block; width: 60px; height: auto; }
+  .pdf-result-thumb .thumb-num { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center; font-size: 9px; font-weight: 600; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+  .pdf-result-thumb .thumb-src { position: absolute; top: 2px; left: 2px; font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 3px; color: white; }
+  .pdf-result-thumb .thumb-remove { position: absolute; top: 2px; right: 2px; width: 14px; height: 14px; background: rgba(220,50,50,0.85); color: white; font-size: 9px; border-radius: 3px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .pdf-result-thumb.dragging { opacity: 0.4; }
+  .pdf-result-thumb.drag-over { border-color: var(--warning); }
+  .pdf-loading { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); padding: 16px 0; }
+  .pdf-edit-btn { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 4px; font-size: 11px; color: var(--text-muted); border: 1px solid var(--border); background: var(--bg); cursor: pointer; transition: all 0.1s; margin-left: 4px; }
+  .pdf-edit-btn:hover { color: var(--primary); border-color: var(--primary); background: var(--primary-light); }
+
   /* ── Forms ── */
   .form-group { margin-bottom: 14px; }
   .form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; }
@@ -757,6 +779,84 @@
   </div>
 </div>
 
+<!-- ── PDF Editor Modal ───────────────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-pdf-editor" style="display:none" onclick="closeModalOutside(event,'modal-pdf-editor')">
+  <div class="modal" style="width:900px;max-width:98vw">
+    <div class="modal-header">
+      <h3><i class="fa fa-scissors" style="margin-right:7px;color:var(--primary)"></i>PDF Editor</h3>
+      <button class="icon-btn" onclick="closeModal('modal-pdf-editor')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body" style="padding:0">
+
+      <!-- Sources row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px solid var(--border)">
+
+        <!-- Source A -->
+        <div style="padding:16px;border-right:1px solid var(--border)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Source A</span>
+            <span id="pdf-a-count" style="font-size:11px;color:var(--text-light)"></span>
+          </div>
+          <select id="pdf-a-picker" style="width:100%;margin-bottom:10px;font-size:12px" onchange="loadPdfSource('a')">
+            <option value="">— select a PDF —</option>
+          </select>
+          <div id="pdf-a-actions" style="display:none;margin-bottom:8px;display:none;gap:6px">
+            <button class="btn btn-sm" onclick="selectAllPages('a')">All</button>
+            <button class="btn btn-sm" onclick="selectNonePages('a')">None</button>
+            <button class="btn btn-sm" onclick="autoSelectPages('a')"><i class="fa fa-magic" style="font-size:10px"></i> Auto</button>
+          </div>
+          <div id="pdf-a-grid" class="pdf-thumb-grid"></div>
+        </div>
+
+        <!-- Source B -->
+        <div style="padding:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Source B <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional — combine)</span></span>
+            <span id="pdf-b-count" style="font-size:11px;color:var(--text-light)"></span>
+          </div>
+          <select id="pdf-b-picker" style="width:100%;margin-bottom:10px;font-size:12px" onchange="loadPdfSource('b')">
+            <option value="">— select a PDF to combine —</option>
+          </select>
+          <div id="pdf-b-actions" style="display:none;gap:6px">
+            <button class="btn btn-sm" onclick="selectAllPages('b')">All</button>
+            <button class="btn btn-sm" onclick="selectNonePages('b')">None</button>
+            <button class="btn btn-sm" onclick="autoSelectPages('b')"><i class="fa fa-magic" style="font-size:10px"></i> Auto</button>
+          </div>
+          <div id="pdf-b-grid" class="pdf-thumb-grid"></div>
+        </div>
+      </div>
+
+      <!-- Result strip -->
+      <div style="padding:16px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <span style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Result</span>
+          <button class="btn btn-sm btn-primary" onclick="buildResult()" style="padding:3px 10px;font-size:11px"><i class="fa fa-play" style="font-size:9px"></i> Build from selected</button>
+          <span id="pdf-result-count" style="font-size:11px;color:var(--text-light);margin-left:auto"></span>
+        </div>
+        <div id="pdf-result-strip" class="pdf-result-strip">
+          <p style="font-size:12px;color:var(--text-light);padding:12px 0">Select pages above and click Build, or drag pages here directly.</p>
+        </div>
+      </div>
+
+      <!-- Save row -->
+      <div style="padding:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:12px;font-weight:600;color:var(--text-muted);white-space:nowrap">Save as:</span>
+        <select id="pdf-save-mode" style="font-size:12px;flex:0 0 auto" onchange="pdfSaveModeChanged()">
+          <option value="overwrite-a">Overwrite Source A</option>
+          <option value="overwrite-b">Overwrite Source B</option>
+          <option value="new">Save as new file</option>
+        </select>
+        <input type="text" id="pdf-save-path" placeholder="e.g. chemistry/national5/2023_paper_clean.pdf" style="flex:1;min-width:200px;font-size:12px;display:none">
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn" onclick="closeModal('modal-pdf-editor')">Cancel</button>
+          <button class="btn btn-primary" id="btn-pdf-save" onclick="savePdfEdit()"><i class="fa fa-save"></i> Save PDF</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <div class="notification" id="notification"></div>
 
 <script>
@@ -1327,7 +1427,14 @@ async function savePaper() {
   closeModal('modal-add-paper');
   renderResourceContent();
   markChanged();
-  notify('Paper saved!', 'success');
+
+  // Offer PDF editor if any PDFs were just uploaded
+  const uploadedPdfs = Object.values(paperData).filter(v => typeof v === 'string' && v.endsWith('.pdf'));
+  if (uploadedPdfs.length) {
+    notifyWithAction('Paper saved!', 'Edit PDF', () => openPdfEditor(uploadedPdfs[0]));
+  } else {
+    notify('Paper saved!', 'success');
+  }
 }
 
 // ── Section item actions ────────────────────────────────────────────────────
@@ -1953,7 +2060,10 @@ function fileCell(path) {
   const name = path.split('/').pop();
   const ext = name.split('.').pop().toLowerCase();
   const icon = ext === 'pdf' ? 'fa-file-pdf' : (ext === 'png' || ext === 'jpg' || ext === 'jpeg' ? 'fa-file-image' : 'fa-file');
-  return `<a href="${path}" class="file-link" target="_blank"><i class="fa ${icon}"></i> ${name}</a>`;
+  const editBtn = ext === 'pdf'
+    ? `<button class="pdf-edit-btn" onclick="openPdfEditor('${path}')" title="Edit PDF"><i class="fa fa-scissors"></i></button>`
+    : '';
+  return `<span style="display:inline-flex;align-items:center;gap:2px"><a href="${path}" class="file-link" target="_blank"><i class="fa ${icon}"></i> ${name}</a>${editBtn}</span>`;
 }
 
 function statusBadge(paper) {
@@ -2013,6 +2123,13 @@ function notify(msg, type = '') {
   el.textContent = (type === 'success' ? '✓ ' : type === 'error' ? '✕ ' : '') + msg;
   el.className = 'notification show ' + type;
   setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+function notifyWithAction(msg, actionLabel, actionFn) {
+  const el = document.getElementById('notification');
+  el.innerHTML = `<span>✓ ${msg}</span><button onclick="(${actionFn.toString()})()" style="margin-left:12px;padding:2px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.15);color:white;font-size:12px;cursor:pointer;font-family:inherit">${actionLabel}</button>`;
+  el.className = 'notification show success';
+  setTimeout(() => el.classList.remove('show'), 6000);
 }
 
 function getSubject(id) { return state.content?.subjects?.find(s => s.id === id); }
@@ -2602,6 +2719,281 @@ async function moveTableRow(rowId, direction) {
   state.content = await (await fetch('/api/content')).json();
   renderResourceContent();
   markChanged();
+}
+
+boot();
+checkPreviewStatus();
+
+// ── PDF Editor ─────────────────────────────────────────────────────────────
+const pdfState = {
+  sources: { a: null, b: null },  // { pages: [{index, thumb, isBlank}], path }
+  result: [],                      // [{ src:'a'|'b', index, thumb }]
+  allPdfs: null,                   // cached from /api/pdf/list
+};
+
+async function openPdfEditor(preloadPath) {
+  // Load file list if not cached
+  if (!pdfState.allPdfs) {
+    const res = await fetch('/api/pdf/list');
+    pdfState.allPdfs = await res.json();
+  }
+
+  // Reset state
+  pdfState.sources = { a: null, b: null };
+  pdfState.result = [];
+
+  // Populate pickers
+  ['a', 'b'].forEach(src => {
+    const sel = document.getElementById(`pdf-${src}-picker`);
+    sel.innerHTML = src === 'a'
+      ? '<option value="">— select a PDF —</option>'
+      : '<option value="">— select a PDF to combine —</option>';
+    pdfState.allPdfs.forEach(group => {
+      const og = document.createElement('optgroup');
+      og.label = group.group || 'root';
+      group.files.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.path;
+        opt.textContent = f.name;
+        og.appendChild(opt);
+      });
+      sel.appendChild(og);
+    });
+    if (preloadPath && src === 'a') {
+      // strip /files/ prefix for matching
+      const rel = preloadPath.replace(/^\/files\//, '');
+      sel.value = rel;
+    }
+    document.getElementById(`pdf-${src}-grid`).innerHTML = '';
+    document.getElementById(`pdf-${src}-count`).textContent = '';
+    document.getElementById(`pdf-${src}-actions`).style.display = 'none';
+  });
+
+  renderResultStrip();
+  pdfSaveModeChanged();
+  openModal('modal-pdf-editor');
+
+  if (preloadPath) {
+    await loadPdfSource('a');
+  }
+}
+
+async function loadPdfSource(src) {
+  const sel = document.getElementById(`pdf-${src}-picker`);
+  const path = sel.value;
+  const grid = document.getElementById(`pdf-${src}-grid`);
+  const countEl = document.getElementById(`pdf-${src}-count`);
+  const actionsEl = document.getElementById(`pdf-${src}-actions`);
+
+  if (!path) {
+    grid.innerHTML = '';
+    countEl.textContent = '';
+    actionsEl.style.display = 'none';
+    pdfState.sources[src] = null;
+    return;
+  }
+
+  grid.innerHTML = '<div class="pdf-loading"><div class="spinner"></div> Loading thumbnails…</div>';
+  countEl.textContent = '';
+  actionsEl.style.display = 'none';
+
+  const res = await fetch(`/api/pdf/thumbnails?path=${encodeURIComponent(path)}`);
+  const data = await res.json();
+  if (data.error) {
+    grid.innerHTML = `<p style="color:var(--danger);font-size:12px">${data.error}</p>`;
+    return;
+  }
+
+  // Store source data — default select all non-blank
+  pdfState.sources[src] = {
+    path,
+    pages: data.pages.map(p => ({ ...p, selected: !p.isBlank })),
+  };
+
+  countEl.textContent = `${data.count} pages`;
+  actionsEl.style.display = 'flex';
+  renderSourceGrid(src);
+  updateSaveMode();
+}
+
+function renderSourceGrid(src) {
+  const grid = document.getElementById(`pdf-${src}-grid`);
+  const source = pdfState.sources[src];
+  if (!source) { grid.innerHTML = ''; return; }
+
+  grid.innerHTML = source.pages.map(p => `
+    <div class="pdf-thumb ${p.selected ? 'selected' : ''} ${p.isBlank ? 'blank-page' : ''}"
+         onclick="togglePageSelect('${src}', ${p.index})" title="Page ${p.index + 1}${p.isBlank ? ' (blank)' : ''}">
+      <img src="${p.thumb}" alt="Page ${p.index + 1}">
+      ${p.isBlank ? '<span class="thumb-badge">blank</span>' : ''}
+      <span class="thumb-num">${p.index + 1}</span>
+    </div>`).join('');
+}
+
+function togglePageSelect(src, index) {
+  const source = pdfState.sources[src];
+  if (!source) return;
+  const page = source.pages.find(p => p.index === index);
+  if (page) page.selected = !page.selected;
+  renderSourceGrid(src);
+}
+
+function selectAllPages(src) {
+  const source = pdfState.sources[src];
+  if (!source) return;
+  source.pages.forEach(p => p.selected = true);
+  renderSourceGrid(src);
+}
+
+function selectNonePages(src) {
+  const source = pdfState.sources[src];
+  if (!source) return;
+  source.pages.forEach(p => p.selected = false);
+  renderSourceGrid(src);
+}
+
+function autoSelectPages(src) {
+  const source = pdfState.sources[src];
+  if (!source) return;
+  source.pages.forEach(p => p.selected = !p.isBlank);
+  renderSourceGrid(src);
+}
+
+function buildResult() {
+  pdfState.result = [];
+  ['a', 'b'].forEach(src => {
+    const source = pdfState.sources[src];
+    if (!source) return;
+    source.pages.filter(p => p.selected).forEach(p => {
+      pdfState.result.push({ src, index: p.index, thumb: p.thumb });
+    });
+  });
+  renderResultStrip();
+}
+
+function renderResultStrip() {
+  const strip = document.getElementById('pdf-result-strip');
+  const countEl = document.getElementById('pdf-result-count');
+
+  if (!pdfState.result.length) {
+    strip.innerHTML = '<p style="font-size:12px;color:var(--text-light);padding:12px 0">Select pages above and click Build, or drag pages here directly.</p>';
+    countEl.textContent = '';
+    return;
+  }
+
+  countEl.textContent = `${pdfState.result.length} pages`;
+  const colours = { a: 'var(--primary)', b: '#1D9E75' };
+
+  strip.innerHTML = pdfState.result.map((p, i) => `
+    <div class="pdf-result-thumb" draggable="true" data-result-idx="${i}"
+         title="Source ${p.src.toUpperCase()} — page ${p.index + 1}">
+      <img src="${p.thumb}" alt="">
+      <span class="thumb-src" style="background:${colours[p.src]}">${p.src.toUpperCase()}</span>
+      <span class="thumb-num">${i + 1}</span>
+      <span class="thumb-remove" onclick="removeResultPage(${i})">×</span>
+    </div>`).join('');
+
+  initResultDragDrop();
+}
+
+function removeResultPage(i) {
+  pdfState.result.splice(i, 1);
+  renderResultStrip();
+}
+
+function initResultDragDrop() {
+  const strip = document.getElementById('pdf-result-strip');
+  let dragged = null;
+
+  strip.querySelectorAll('.pdf-result-thumb').forEach(el => {
+    el.addEventListener('dragstart', () => {
+      dragged = el;
+      setTimeout(() => el.classList.add('dragging'), 0);
+    });
+    el.addEventListener('dragend', () => {
+      el.classList.remove('dragging');
+      strip.querySelectorAll('.pdf-result-thumb').forEach(e => e.classList.remove('drag-over'));
+    });
+    el.addEventListener('dragover', e => {
+      e.preventDefault();
+      strip.querySelectorAll('.pdf-result-thumb').forEach(e => e.classList.remove('drag-over'));
+      if (el !== dragged) el.classList.add('drag-over');
+    });
+    el.addEventListener('drop', e => {
+      e.preventDefault();
+      if (el === dragged) return;
+      const fromIdx = parseInt(dragged.dataset.resultIdx);
+      const toIdx = parseInt(el.dataset.resultIdx);
+      const [moved] = pdfState.result.splice(fromIdx, 1);
+      pdfState.result.splice(toIdx, 0, moved);
+      renderResultStrip();
+    });
+  });
+}
+
+function updateSaveMode() {
+  const sel = document.getElementById('pdf-save-mode');
+  const bOpt = sel.querySelector('option[value="overwrite-b"]');
+  if (bOpt) bOpt.disabled = !pdfState.sources.b;
+}
+
+function pdfSaveModeChanged() {
+  const mode = document.getElementById('pdf-save-mode').value;
+  const pathInput = document.getElementById('pdf-save-path');
+  pathInput.style.display = mode === 'new' ? 'block' : 'none';
+}
+
+async function savePdfEdit() {
+  if (!pdfState.result.length) {
+    notify('Build a result first — select pages and click Build.', 'warning');
+    return;
+  }
+
+  const mode = document.getElementById('pdf-save-mode').value;
+  let outputPath;
+  if (mode === 'overwrite-a') {
+    if (!pdfState.sources.a) { notify('Source A not loaded', 'error'); return; }
+    outputPath = pdfState.sources.a.path;
+  } else if (mode === 'overwrite-b') {
+    if (!pdfState.sources.b) { notify('Source B not loaded', 'error'); return; }
+    outputPath = pdfState.sources.b.path;
+  } else {
+    outputPath = document.getElementById('pdf-save-path').value.trim();
+    if (!outputPath) { notify('Enter a save path', 'warning'); return; }
+  }
+
+  // Group consecutive pages from same source into ranges for efficiency
+  const sources = [];
+  let cur = null;
+  for (const p of pdfState.result) {
+    if (!cur || cur.path !== (pdfState.sources[p.src]?.path)) {
+      cur = { path: pdfState.sources[p.src].path, pages: [] };
+      sources.push(cur);
+    }
+    cur.pages.push(p.index);
+  }
+
+  const btn = document.getElementById('btn-pdf-save');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Saving…';
+
+  const res = await fetch('/api/pdf/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ output: outputPath, sources }),
+  });
+  const data = await res.json();
+
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fa fa-save"></i> Save PDF';
+
+  if (data.error) {
+    notify('Error: ' + data.error, 'error');
+  } else {
+    notify(`PDF saved — ${data.pages} pages`, 'success');
+    pdfState.allPdfs = null; // refresh file list next open
+    closeModal('modal-pdf-editor');
+  }
 }
 
 boot();

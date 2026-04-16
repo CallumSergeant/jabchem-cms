@@ -5,11 +5,13 @@ import subprocess
 import socket
 import sys
 import tempfile
+import base64
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
+import fitz  # PyMuPDF
 
 load_dotenv()
 
@@ -831,6 +833,120 @@ def update_nav_order():
     content['site']['nav']['subjectOrder'] = request.json.get('order', [])
     write_content(content)
     return jsonify({'status': 'ok'})
+
+
+# ── PDF Editor ────────────────────────────────────────────────────────────────
+
+def _resolve_pdf_path(rel_path):
+    """Resolve a relative PDF path to an absolute path inside FILES_DIR."""
+    # Strip leading /files/ prefix if present
+    rel = rel_path.lstrip('/')
+    if rel.startswith('files/'):
+        rel = rel[len('files/'):]
+    p = (FILES_DIR / rel).resolve()
+    # Safety: must stay inside FILES_DIR
+    if not str(p).startswith(str(FILES_DIR.resolve())):
+        return None
+    return p
+
+
+def _is_blank_page(page):
+    """Return True if the page has no text and no images."""
+    return page.get_text().strip() == '' and len(page.get_images()) == 0
+
+
+@app.route('/api/pdf/thumbnails', methods=['GET'])
+def pdf_thumbnails():
+    rel_path = request.args.get('path', '')
+    if not rel_path:
+        return jsonify({'error': 'path required'}), 400
+
+    p = _resolve_pdf_path(rel_path)
+    if not p or not p.exists():
+        return jsonify({'error': 'File not found'}), 404
+
+    try:
+        doc = fitz.open(str(p))
+        pages = []
+        mat = fitz.Matrix(0.3, 0.3)  # ~30% scale for thumbnails
+        for i, page in enumerate(doc):
+            pix = page.get_pixmap(matrix=mat)
+            thumb = 'data:image/jpeg;base64,' + base64.b64encode(
+                pix.tobytes('jpeg', jpg_quality=70)
+            ).decode()
+            pages.append({
+                'index': i,
+                'thumb': thumb,
+                'isBlank': _is_blank_page(page),
+            })
+        doc.close()
+        return jsonify({'pages': pages, 'count': len(pages)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/pdf/list', methods=['GET'])
+def pdf_list():
+    """Return all PDFs in FILES_DIR grouped by subject/level."""
+    if not FILES_DIR.exists():
+        return jsonify([])
+    groups = {}
+    for pdf in sorted(FILES_DIR.rglob('*.pdf')):
+        rel = pdf.relative_to(FILES_DIR)
+        parts = rel.parts
+        group = '/'.join(parts[:-1]) if len(parts) > 1 else ''
+        groups.setdefault(group, []).append({
+            'path': str(rel),
+            'name': pdf.name,
+            'url': '/files/' + str(rel),
+        })
+    result = [{'group': g, 'files': files} for g, files in sorted(groups.items())]
+    return jsonify(result)
+
+
+@app.route('/api/pdf/save', methods=['POST'])
+def pdf_save():
+    """
+    Build a PDF from specified pages of one or more source files and save.
+    Body: { output: "rel/path.pdf", sources: [{ path, pages: [0,1,2] }] }
+    """
+    data = request.json or {}
+    output_rel = data.get('output', '').lstrip('/')
+    if output_rel.startswith('files/'):
+        output_rel = output_rel[len('files/'):]
+    sources = data.get('sources', [])
+
+    if not output_rel or not sources:
+        return jsonify({'error': 'output and sources required'}), 400
+
+    output_path = (FILES_DIR / output_rel).resolve()
+    if not str(output_path).startswith(str(FILES_DIR.resolve())):
+        return jsonify({'error': 'Invalid output path'}), 400
+
+    try:
+        result_doc = fitz.open()
+        for src in sources:
+            src_path = _resolve_pdf_path(src.get('path', ''))
+            if not src_path or not src_path.exists():
+                return jsonify({'error': f'Source not found: {src.get("path")}'}), 404
+            page_indices = src.get('pages', [])
+            if not page_indices:
+                continue
+            src_doc = fitz.open(str(src_path))
+            for idx in page_indices:
+                if 0 <= idx < len(src_doc):
+                    result_doc.insert_pdf(src_doc, from_page=idx, to_page=idx)
+            src_doc.close()
+
+        if len(result_doc) == 0:
+            return jsonify({'error': 'No pages selected'}), 400
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        result_doc.save(str(output_path), garbage=4, deflate=True)
+        result_doc.close()
+        return jsonify({'status': 'ok', 'pages': len(result_doc), 'path': '/files/' + output_rel})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
