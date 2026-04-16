@@ -1026,8 +1026,9 @@ def pdf_watermark():
                 overlay=True,
             )
 
-        doc.save(str(p), garbage=4, deflate=True)
+        pdf_bytes = doc.tobytes(garbage=4, deflate=True)
         doc.close()
+        p.write_bytes(pdf_bytes)
         return jsonify({'status': 'ok'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1114,8 +1115,9 @@ def pdf_annotate():
             if redacts:
                 page.apply_redactions()
 
-        doc.save(str(p), garbage=4, deflate=True)
+        pdf_bytes = doc.tobytes(garbage=4, deflate=True)
         doc.close()
+        p.write_bytes(pdf_bytes)
         return jsonify({'status': 'ok'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
