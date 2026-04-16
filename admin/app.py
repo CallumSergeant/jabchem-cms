@@ -942,9 +942,10 @@ def pdf_save():
             return jsonify({'error': 'No pages selected'}), 400
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        page_count = len(result_doc)
         result_doc.save(str(output_path), garbage=4, deflate=True)
         result_doc.close()
-        return jsonify({'status': 'ok', 'pages': len(result_doc), 'path': '/files/' + output_rel})
+        return jsonify({'status': 'ok', 'pages': page_count, 'path': '/files/' + output_rel})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
