@@ -789,18 +789,18 @@
     <div class="modal-body" style="padding:0">
 
       <!-- Sources row -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px solid var(--border)">
+      <div style="border-bottom:1px solid var(--border)">
 
         <!-- Source A -->
-        <div style="padding:16px;border-right:1px solid var(--border)">
+        <div style="padding:16px;border-bottom:1px solid var(--border-light)">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <span style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Source A</span>
+            <span style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Source</span>
             <span id="pdf-a-count" style="font-size:11px;color:var(--text-light)"></span>
           </div>
           <select id="pdf-a-picker" style="width:100%;margin-bottom:10px;font-size:12px" onchange="loadPdfSource('a')">
             <option value="">— select a PDF —</option>
           </select>
-          <div id="pdf-a-actions" style="display:none;margin-bottom:8px;display:none;gap:6px">
+          <div id="pdf-a-actions" style="display:none;margin-bottom:8px;gap:6px">
             <button class="btn btn-sm" onclick="selectAllPages('a')">All</button>
             <button class="btn btn-sm" onclick="selectNonePages('a')">None</button>
             <button class="btn btn-sm" onclick="autoSelectPages('a')"><i class="fa fa-magic" style="font-size:10px"></i> Auto</button>
@@ -808,22 +808,27 @@
           <div id="pdf-a-grid" class="pdf-thumb-grid"></div>
         </div>
 
-        <!-- Source B -->
-        <div style="padding:16px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <span style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Source B <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional — combine)</span></span>
-            <span id="pdf-b-count" style="font-size:11px;color:var(--text-light)"></span>
+        <!-- Source B — collapsible -->
+        <details id="pdf-source-b-details" style="padding:0">
+          <summary style="padding:12px 16px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;list-style:none;display:flex;align-items:center;gap:7px;user-select:none">
+            <i class="fa fa-chevron-right" id="pdf-b-chevron" style="font-size:10px;transition:transform 0.15s"></i>
+            Combine with a second PDF
+            <span style="font-weight:400;color:var(--text-light)">(optional)</span>
+            <span id="pdf-b-count" style="margin-left:auto;font-size:11px;color:var(--text-light)"></span>
+          </summary>
+          <div style="padding:0 16px 16px">
+            <select id="pdf-b-picker" style="width:100%;margin-bottom:10px;font-size:12px" onchange="loadPdfSource('b')">
+              <option value="">— select a PDF to combine —</option>
+            </select>
+            <div id="pdf-b-actions" style="display:none;margin-bottom:8px;gap:6px">
+              <button class="btn btn-sm" onclick="selectAllPages('b')">All</button>
+              <button class="btn btn-sm" onclick="selectNonePages('b')">None</button>
+              <button class="btn btn-sm" onclick="autoSelectPages('b')"><i class="fa fa-magic" style="font-size:10px"></i> Auto</button>
+            </div>
+            <div id="pdf-b-grid" class="pdf-thumb-grid"></div>
           </div>
-          <select id="pdf-b-picker" style="width:100%;margin-bottom:10px;font-size:12px" onchange="loadPdfSource('b')">
-            <option value="">— select a PDF to combine —</option>
-          </select>
-          <div id="pdf-b-actions" style="display:none;gap:6px">
-            <button class="btn btn-sm" onclick="selectAllPages('b')">All</button>
-            <button class="btn btn-sm" onclick="selectNonePages('b')">None</button>
-            <button class="btn btn-sm" onclick="autoSelectPages('b')"><i class="fa fa-magic" style="font-size:10px"></i> Auto</button>
-          </div>
-          <div id="pdf-b-grid" class="pdf-thumb-grid"></div>
-        </div>
+        </details>
+
       </div>
 
       <!-- Result strip -->
@@ -1348,7 +1353,13 @@ function fileUploadField(id, label, path, optional = false) {
   return `
     <div class="form-group">
       <label>${label}${optional ? ' <span style="color:var(--text-light);font-weight:400">(optional)</span>' : ''}</label>
-      <input type="file" id="${id}" accept=".pdf" onchange="onFileChosen('${id}','${path}')">
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="file" id="${id}" accept=".pdf" onchange="onFileChosen('${id}','${path}')" style="flex:1">
+        <button class="pdf-edit-btn" id="edit-btn-${id}" style="display:none;white-space:nowrap"
+                onclick="uploadAndEditPdf('${id}','${path}')">
+          <i class="fa fa-scissors"></i> Edit PDF
+        </button>
+      </div>
       <div class="url-or-divider"><span>or paste URL</span></div>
       <input type="url" id="${id}-url" class="url-fetch-input" placeholder="https://…"
              oninput="onUrlTyped('${id}','${path}')">
@@ -1359,9 +1370,54 @@ function fileUploadField(id, label, path, optional = false) {
 function onFileChosen(id, path) {
   const file = document.getElementById(id)?.files[0];
   const urlEl = document.getElementById(id + '-url');
+  const editBtn = document.getElementById('edit-btn-' + id);
   if (file) {
     if (urlEl) urlEl.value = '';
+    // Clear any previously uploaded path so it re-uploads the new file
+    delete document.getElementById(id).dataset.uploadedPath;
     document.getElementById('preview-' + id).textContent = `→ /files${path} ✓`;
+    if (editBtn) editBtn.style.display = 'inline-flex';
+  } else {
+    if (editBtn) editBtn.style.display = 'none';
+  }
+}
+
+async function uploadAndEditPdf(id, path) {
+  const fileEl = document.getElementById(id);
+  const btn = document.getElementById('edit-btn-' + id);
+  if (!fileEl?.files[0]) return;
+
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const year = document.getElementById('paper-year')?.value || '0000';
+
+  // Derive upload fields from the field id
+  const typeMap = {
+    'file-paper': 'paper', 'file-paper1': 'paper1', 'file-paper2': 'paper2',
+    'file-jabchem-ms': 'jabchem_ms', 'file-ms': 'ms'
+  };
+  const fileType = typeMap[id] || id.replace('file-', '');
+  const uploadFields = {
+    subject_id: subj.slug, level_id: level.slug,
+    section_id: state.activeSectionId,
+    year: year.toString(), file_type: fileType
+  };
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:12px;height:12px"></div> Uploading…';
+
+  try {
+    const uploadedPath = await uploadFile(fileEl.files[0], uploadFields);
+    // Store the uploaded path so savePaper skips re-uploading
+    fileEl.dataset.uploadedPath = uploadedPath;
+    document.getElementById('preview-' + id).textContent = `→ ${uploadedPath} ✓ (uploaded)`;
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa fa-scissors"></i> Edit PDF';
+    openPdfEditor(uploadedPath);
+  } catch (e) {
+    notify(e.message, 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa fa-scissors"></i> Edit PDF';
   }
 }
 
@@ -2036,6 +2092,8 @@ async function fetchFromUrl(url, fields) {
 async function resolveFileField(fileInputId, urlInputId, uploadFields) {
   const fileEl = document.getElementById(fileInputId);
   const urlEl  = document.getElementById(urlInputId);
+  // If already uploaded via Edit PDF button, use that path directly
+  if (fileEl?.dataset.uploadedPath) return fileEl.dataset.uploadedPath;
   if (fileEl?.files[0]) return await uploadFile(fileEl.files[0], uploadFields);
   const url = urlEl?.value.trim();
   if (url) return await fetchFromUrl(url, uploadFields);
@@ -2730,6 +2788,15 @@ const pdfState = {
   result: [],                      // [{ src:'a'|'b', index, thumb }]
   allPdfs: null,                   // cached from /api/pdf/list
 };
+
+// Chevron toggle for Source B details element
+document.addEventListener('DOMContentLoaded', () => {
+  const det = document.getElementById('pdf-source-b-details');
+  if (det) det.addEventListener('toggle', () => {
+    const ch = document.getElementById('pdf-b-chevron');
+    if (ch) ch.style.transform = det.open ? 'rotate(90deg)' : 'rotate(0deg)';
+  });
+});
 
 async function openPdfEditor(preloadPath) {
   // Load file list if not cached
