@@ -1,0 +1,838 @@
+import os
+import json
+import shutil
+import subprocess
+import socket
+import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+from flask import Flask, request, jsonify, render_template, send_from_directory
+from werkzeug.utils import secure_filename
+from dotenv import load_dotenv
+
+load_dotenv()
+
+app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max upload
+
+# ── Paths ────────────────────────────────────────────────────────────────────
+BASE_DIR     = Path(__file__).parent.parent
+CONTENT_FILE = BASE_DIR / 'content' / 'content.json'
+FILES_DIR    = BASE_DIR / 'content' / 'files'
+SITE_DIR     = BASE_DIR / 'site'
+BUILDER      = BASE_DIR / 'builder' / 'build.py'
+
+ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'svg', 'zip'}
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
+def read_content():
+    with open(CONTENT_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def write_content(data):
+    with open(CONTENT_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def find_subject(content, subject_id):
+    for s in content['subjects']:
+        if s['id'] == subject_id:
+            return s
+    return None
+
+def find_level(subject, level_id):
+    for lv in subject.get('levels', []):
+        if lv['id'] == level_id:
+            return lv
+    return None
+
+def find_section(level, section_id):
+    for s in level.get('sections', []):
+        if s['id'] == section_id:
+            return s
+    return None
+
+def build_file_path(subject_id, level_id, year, file_type, is_archive=False):
+    """Generate a canonical file path for a given resource."""
+    base = f"files/{subject_id}/{level_id}"
+    if is_archive:
+        base += "/archive"
+    name = f"{year}_{file_type}.pdf"
+    return f"/{base}/{name}"
+
+def build_resource_path(subject_id, level_id, resource_type, filename):
+    """Generate a path for non-paper resources like traffic lights."""
+    safe = secure_filename(filename)
+    return f"/files/{subject_id}/{level_id}/{resource_type}/{safe}"
+
+
+# ── Admin UI ─────────────────────────────────────────────────────────────────
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+# ── Content API ──────────────────────────────────────────────────────────────
+@app.route('/api/content', methods=['GET'])
+def get_content():
+    return jsonify(read_content())
+
+@app.route('/api/site', methods=['PUT'])
+def update_site():
+    content = read_content()
+    content['site'].update(request.json)
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/subjects', methods=['GET'])
+def get_subjects():
+    content = read_content()
+    return jsonify(content['subjects'])
+
+@app.route('/api/subjects', methods=['POST'])
+def add_subject():
+    content = read_content()
+    new_subject = request.json
+
+    # Check slug is unique
+    existing_slugs = [s['slug'] for s in content['subjects']]
+    if new_subject['slug'] in existing_slugs:
+        return jsonify({'error': 'A subject with this URL slug already exists'}), 400
+
+    # Build default level structure — each level starts with an empty Past Papers section
+    default_levels = []
+    for level_id in new_subject.get('levelIds', ['national5', 'higher', 'advancedhigher']):
+        level_titles = {
+            'national5': ('National 5', 'N5'),
+            'higher': ('Higher', 'Higher'),
+            'advancedhigher': ('Advanced Higher', 'AH')
+        }
+        title, short = level_titles.get(level_id, (level_id.title(), level_id[:3].upper()))
+        lv = {
+            'id': level_id, 'title': title, 'shortTitle': short,
+            'slug': level_id, 'published': True,
+            'description': f"{title} {new_subject['title']} past papers and revision resources.",
+            'sections': [
+                {
+                    'id': 'past_papers',
+                    'title': 'Past Papers',
+                    'resourceType': 'pastPapers',
+                    'jabchemMarkingScheme': True,
+                    'papers': []
+                }
+            ]
+        }
+        default_levels.append(lv)
+
+    new_subject['levels'] = default_levels
+    new_subject.pop('resourceTypes', None)  # no longer used
+
+    # Create file directories
+    for level_id in new_subject.get('levelIds', ['national5', 'higher', 'advancedhigher']):
+        p = FILES_DIR / new_subject['slug'] / level_id
+        p.mkdir(parents=True, exist_ok=True)
+        (p / 'archive').mkdir(exist_ok=True)
+
+    content['subjects'].append(new_subject)
+
+    # Ensure subject order includes the new subject
+    if new_subject['id'] not in content['site']['nav']['subjectOrder']:
+        content['site']['nav']['subjectOrder'].append(new_subject['id'])
+
+    write_content(content)
+    return jsonify({'status': 'ok', 'subject': new_subject})
+
+@app.route('/api/subjects/<subject_id>', methods=['PUT'])
+def update_subject(subject_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    if not subject:
+        return jsonify({'error': 'Subject not found'}), 404
+    updates = request.json
+    subject.update(updates)
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/subjects/<subject_id>', methods=['DELETE'])
+def delete_subject(subject_id):
+    content = read_content()
+    content['subjects'] = [s for s in content['subjects'] if s['id'] != subject_id]
+    if subject_id in content['site']['nav']['subjectOrder']:
+        content['site']['nav']['subjectOrder'].remove(subject_id)
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/subjects/<subject_id>/levels', methods=['POST'])
+def add_level(subject_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    if not subject:
+        return jsonify({'error': 'Subject not found'}), 404
+    data = request.json
+    title = data.get('title', '').strip()
+    short_title = data.get('shortTitle', '').strip()
+    if not title:
+        return jsonify({'error': 'Title is required'}), 400
+    import re
+    level_id = re.sub(r'[^a-z0-9]', '', title.lower().replace(' ', ''))
+    if not level_id:
+        level_id = 'level_' + str(len(subject.get('levels', [])))
+    # Ensure unique id
+    existing_ids = [l['id'] for l in subject.get('levels', [])]
+    base_id = level_id
+    i = 2
+    while level_id in existing_ids:
+        level_id = base_id + str(i)
+        i += 1
+    new_level = {
+        'id': level_id,
+        'title': title,
+        'shortTitle': short_title or title[:6],
+        'slug': level_id,
+        'published': True,
+        'description': f"{title} {subject['title']} past papers and revision resources.",
+        'sections': [
+            {
+                'id': 'past_papers',
+                'title': 'Past Papers',
+                'resourceType': 'pastPapers',
+                'jabchemMarkingScheme': True,
+                'papers': []
+            }
+        ]
+    }
+    subject.setdefault('levels', []).append(new_level)
+    # Create file directories
+    p = FILES_DIR / subject['slug'] / level_id
+    p.mkdir(parents=True, exist_ok=True)
+    (p / 'archive').mkdir(exist_ok=True)
+    write_content(content)
+    return jsonify({'status': 'ok', 'level': new_level})
+
+@app.route('/api/subjects/<subject_id>/levels/<level_id>', methods=['PUT'])
+def update_level(subject_id, level_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    if not subject:
+        return jsonify({'error': 'Subject not found'}), 404
+    level = find_level(subject, level_id)
+    if not level:
+        return jsonify({'error': 'Level not found'}), 404
+    level.update(request.json)
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/subjects/<subject_id>/levels/<level_id>', methods=['DELETE'])
+def delete_level(subject_id, level_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    if not subject:
+        return jsonify({'error': 'Subject not found'}), 404
+    subject['levels'] = [l for l in subject.get('levels', []) if l['id'] != level_id]
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/subjects/<subject_id>/levels/reorder', methods=['PUT'])
+def reorder_levels(subject_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    if not subject:
+        return jsonify({'error': 'Subject not found'}), 404
+    order = request.json.get('order', [])
+    levels_by_id = {l['id']: l for l in subject.get('levels', [])}
+    subject['levels'] = [levels_by_id[lid] for lid in order if lid in levels_by_id]
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+
+# ── Sections API ─────────────────────────────────────────────────────────────
+@app.route('/api/subjects/<subject_id>/levels/<level_id>/sections', methods=['POST'])
+def add_section(subject_id, level_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    level = find_level(subject, level_id) if subject else None
+    if not level:
+        return jsonify({'error': 'Not found'}), 404
+    data = request.json
+    title = data.get('title', 'New section')
+    resource_type = data.get('resourceType', 'pastPapers')
+    import re
+    section_id = re.sub(r'[^a-z0-9_]', '', title.lower().replace(' ', '_'))[:30]
+    new_section = {'id': section_id, 'title': title, 'resourceType': resource_type}
+    if resource_type in ('pastPapers', 'archive'):
+        new_section['jabchemMarkingScheme'] = data.get('jabchemMarkingScheme', True)
+        new_section['papers'] = []
+    elif resource_type == 'customTable':
+        new_section['description'] = ''
+        new_section['footnote'] = ''
+        new_section['columns'] = []
+        new_section['rows'] = []
+    else:
+        new_section['items'] = []
+    level.setdefault('sections', []).append(new_section)
+    write_content(content)
+    return jsonify({'status': 'ok', 'section': new_section})
+
+@app.route('/api/subjects/<subject_id>/levels/<level_id>/sections/<section_id>', methods=['PUT'])
+def update_section(subject_id, level_id, section_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    level = find_level(subject, level_id) if subject else None
+    if not level:
+        return jsonify({'error': 'Not found'}), 404
+    section = find_section(level, section_id)
+    if not section:
+        return jsonify({'error': 'Section not found'}), 404
+    data = request.json
+    for field in ('title', 'jabchemMarkingScheme', 'resourceType', 'description', 'footnote', 'columns'):
+        if field in data:
+            section[field] = data[field]
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/subjects/<subject_id>/levels/<level_id>/sections/<section_id>', methods=['DELETE'])
+def delete_section(subject_id, level_id, section_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    level = find_level(subject, level_id) if subject else None
+    if not level:
+        return jsonify({'error': 'Not found'}), 404
+    level['sections'] = [s for s in level.get('sections', []) if s['id'] != section_id]
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/subjects/<subject_id>/levels/<level_id>/sections/reorder', methods=['PUT'])
+def reorder_sections(subject_id, level_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    level = find_level(subject, level_id) if subject else None
+    if not level:
+        return jsonify({'error': 'Not found'}), 404
+    order = request.json.get('order', [])
+    sections_by_id = {s['id']: s for s in level.get('sections', [])}
+    level['sections'] = [sections_by_id[sid] for sid in order if sid in sections_by_id]
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+
+# ── Papers API ───────────────────────────────────────────────────────────────
+@app.route('/api/subjects/<subject_id>/levels/<level_id>/papers', methods=['POST'])
+def add_paper(subject_id, level_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    if not subject:
+        return jsonify({'error': 'Subject not found'}), 404
+    level = find_level(subject, level_id)
+    if not level:
+        return jsonify({'error': 'Level not found'}), 404
+
+    paper_data = request.json
+    year = paper_data.get('year')
+    section_id = paper_data.get('section_id')
+
+    if not section_id:
+        return jsonify({'error': 'section_id is required'}), 400
+
+    section = find_section(level, section_id)
+    if not section:
+        return jsonify({'error': 'Section not found'}), 404
+
+    label = (paper_data.get('label') or '').strip()
+
+    new_paper = {
+        'year': year,
+        'paper': paper_data.get('paper', None),
+        'jabchemMarkingScheme': paper_data.get('jabchemMarkingScheme', None),
+        'markingScheme': paper_data.get('markingScheme', None),
+        'published': True
+    }
+    if label:
+        new_paper['label'] = label
+
+    # Handle multi-part paper subjects (e.g. Maths)
+    if 'paperStructure' in subject:
+        for part in subject['paperStructure']['parts']:
+            new_paper[part['id']] = paper_data.get(part['id'], None)
+        new_paper.pop('paper', None)
+
+    target = section.setdefault('papers', [])
+    existing_keys = [(p['year'], p.get('label', '') or '') for p in target]
+    if (year, label) in existing_keys:
+        suffix = f' ({label})' if label else ''
+        return jsonify({'error': f'A paper for {year}{suffix} already exists in this section'}), 400
+
+    target.append(new_paper)
+    target.sort(key=lambda p: p['year'], reverse=True)
+
+    write_content(content)
+    return jsonify({'status': 'ok', 'paper': new_paper})
+
+@app.route('/api/subjects/<subject_id>/levels/<level_id>/papers/<int:year>', methods=['PUT'])
+def update_paper(subject_id, level_id, year):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    level = find_level(subject, level_id) if subject else None
+    if not level:
+        return jsonify({'error': 'Not found'}), 404
+    all_papers = []
+    for s in level.get('sections', []):
+        all_papers += s.get('papers', [])
+    for paper in all_papers:
+        if paper['year'] == year:
+            paper.update(request.json)
+            break
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/subjects/<subject_id>/levels/<level_id>/papers/<int:year>', methods=['DELETE'])
+def delete_paper(subject_id, level_id, year):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    level = find_level(subject, level_id) if subject else None
+    if not level:
+        return jsonify({'error': 'Not found'}), 404
+    for section in level.get('sections', []):
+        section['papers'] = [p for p in section.get('papers', []) if p['year'] != year]
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/subjects/<subject_id>/levels/<level_id>/sections/<section_id>/papers/<int:year>', methods=['DELETE'])
+def delete_paper_in_section(subject_id, level_id, section_id, year):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    level = find_level(subject, level_id) if subject else None
+    section = find_section(level, section_id) if level else None
+    if not section:
+        return jsonify({'error': 'Not found'}), 404
+    label = request.args.get('label', None)
+    if label is not None:
+        section['papers'] = [p for p in section.get('papers', [])
+                             if not (p['year'] == year and (p.get('label', '') or '') == label)]
+    else:
+        section['papers'] = [p for p in section.get('papers', []) if p['year'] != year]
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/subjects/<subject_id>/levels/<level_id>/sections/<section_id>/papers/<int:year>', methods=['PUT'])
+def update_paper_in_section(subject_id, level_id, section_id, year):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    level = find_level(subject, level_id) if subject else None
+    section = find_section(level, section_id) if level else None
+    if not section:
+        return jsonify({'error': 'Not found'}), 404
+    label = request.args.get('label', None)
+    data = request.json
+    for paper in section.get('papers', []):
+        if paper['year'] == year and (label is None or (paper.get('label', '') or '') == label):
+            paper.update(data)
+            if 'label' in data and not data['label']:
+                paper.pop('label', None)
+            break
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+
+# ── Section items API (traffic lights, study notes etc) ─────────────────────
+@app.route('/api/subjects/<subject_id>/levels/<level_id>/sections/<section_id>/items', methods=['POST'])
+def add_section_item(subject_id, level_id, section_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    level = find_level(subject, level_id) if subject else None
+    section = find_section(level, section_id) if level else None
+    if not section:
+        return jsonify({'error': 'Not found'}), 404
+    data = request.json
+    items = section.setdefault('items', [])
+    items.append({
+        'id': data.get('id', f"item_{len(items)+1}"),
+        'title': data.get('title', 'Untitled'),
+        'file': data.get('file', None),
+        'published': True
+    })
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/subjects/<subject_id>/levels/<level_id>/sections/<section_id>/items/<item_id>', methods=['PUT'])
+def update_section_item(subject_id, level_id, section_id, item_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    level = find_level(subject, level_id) if subject else None
+    section = find_section(level, section_id) if level else None
+    if not section:
+        return jsonify({'error': 'Not found'}), 404
+    data = request.json
+    for item in section.get('items', []):
+        if item['id'] == item_id:
+            for field in ('title', 'file', 'published'):
+                if field in data:
+                    item[field] = data[field]
+            break
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/subjects/<subject_id>/levels/<level_id>/sections/<section_id>/items/<item_id>', methods=['DELETE'])
+def delete_section_item(subject_id, level_id, section_id, item_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    level = find_level(subject, level_id) if subject else None
+    section = find_section(level, section_id) if level else None
+    if not section:
+        return jsonify({'error': 'Not found'}), 404
+    section['items'] = [r for r in section.get('items', []) if r['id'] != item_id]
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+
+# ── Custom table rows API ────────────────────────────────────────────────────
+@app.route('/api/subjects/<subject_id>/levels/<level_id>/sections/<section_id>/rows', methods=['POST'])
+def add_table_row(subject_id, level_id, section_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    level = find_level(subject, level_id) if subject else None
+    section = find_section(level, section_id) if level else None
+    if not section:
+        return jsonify({'error': 'Not found'}), 404
+    import time
+    data = request.json
+    row_id = 'row_' + str(int(time.time() * 1000) % 10000000)
+    row = {'id': row_id, 'published': True}
+    if 'number' in data:
+        row['number'] = data['number']
+    for col in section.get('columns', []):
+        if col['id'] in data:
+            row[col['id']] = data[col['id']]
+    section.setdefault('rows', []).append(row)
+    write_content(content)
+    return jsonify({'status': 'ok', 'row': row})
+
+@app.route('/api/subjects/<subject_id>/levels/<level_id>/sections/<section_id>/rows/<row_id>', methods=['PUT'])
+def update_table_row(subject_id, level_id, section_id, row_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    level = find_level(subject, level_id) if subject else None
+    section = find_section(level, section_id) if level else None
+    if not section:
+        return jsonify({'error': 'Not found'}), 404
+    data = request.json
+    for row in section.get('rows', []):
+        if row['id'] == row_id:
+            row.update(data)
+            break
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/subjects/<subject_id>/levels/<level_id>/sections/<section_id>/rows/<row_id>', methods=['DELETE'])
+def delete_table_row(subject_id, level_id, section_id, row_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    level = find_level(subject, level_id) if subject else None
+    section = find_section(level, section_id) if level else None
+    if not section:
+        return jsonify({'error': 'Not found'}), 404
+    section['rows'] = [r for r in section.get('rows', []) if r['id'] != row_id]
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/subjects/<subject_id>/levels/<level_id>/sections/<section_id>/rows/reorder', methods=['PUT'])
+def reorder_table_rows(subject_id, level_id, section_id):
+    content = read_content()
+    subject = find_subject(content, subject_id)
+    level = find_level(subject, level_id) if subject else None
+    section = find_section(level, section_id) if level else None
+    if not section:
+        return jsonify({'error': 'Not found'}), 404
+    order = request.json.get('order', [])
+    rows_by_id = {r['id']: r for r in section.get('rows', [])}
+    section['rows'] = [rows_by_id[rid] for rid in order if rid in rows_by_id]
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+
+# ── File Upload ───────────────────────────────────────────────────────────────
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    if not file or not allowed_file(file.filename):
+        return jsonify({'error': 'Invalid file type'}), 400
+
+    subject_id   = request.form.get('subject_id', '')
+    level_id     = request.form.get('level_id', '')
+    section_id   = request.form.get('section_id', '')
+    file_type    = request.form.get('file_type', 'misc')   # paper / ms / qmap / tl / notes / data
+    year         = request.form.get('year', '')
+    is_archive   = request.form.get('is_archive', 'false') == 'true'
+    custom_name  = request.form.get('custom_name', '')
+
+    # Build filename
+    if year:
+        filename = f"{year}_{file_type}.pdf"
+    elif custom_name:
+        filename = secure_filename(custom_name)
+        if not filename.endswith('.pdf'):
+            filename += '.pdf'
+    else:
+        filename = secure_filename(file.filename)
+
+    # Build destination directory — section_id gives each section its own folder,
+    # preventing year collisions across sections in the same level
+    dest_dir = FILES_DIR / subject_id / level_id
+    if section_id:
+        dest_dir = dest_dir / section_id
+    elif is_archive:
+        dest_dir = dest_dir / 'archive'
+    elif file_type in ('trafficLights', 'studyNotes', 'dataBooklets', 'formulaSheets', 'questionMaps'):
+        dest_dir = dest_dir / file_type
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_path = dest_dir / filename
+    file.save(dest_path)
+
+    # Return the web-root-relative path
+    web_path = '/' + str(dest_path.relative_to(FILES_DIR.parent)).replace('\\', '/')
+    return jsonify({'status': 'ok', 'path': web_path, 'filename': filename})
+
+
+# ── Fetch PDF from URL ───────────────────────────────────────────────────────
+@app.route('/api/fetch-url', methods=['POST'])
+def fetch_from_url():
+    import urllib.request
+    data = request.json
+    url        = data.get('url', '').strip()
+    subject_id = data.get('subject_id', '')
+    level_id   = data.get('level_id', '')
+    section_id = data.get('section_id', '')
+    file_type  = data.get('file_type', 'misc')
+    year       = data.get('year', '')
+    is_archive = data.get('is_archive', False)
+
+    if not url:
+        return jsonify({'error': 'No URL provided'}), 400
+
+    # Build filename (same logic as upload)
+    if year:
+        filename = f"{year}_{file_type}.pdf"
+    else:
+        url_path = url.split('?')[0]
+        raw_name = url_path.split('/')[-1]
+        filename = secure_filename(raw_name) or 'resource.pdf'
+        if not filename.lower().endswith('.pdf'):
+            filename += '.pdf'
+
+    # Build destination directory
+    dest_dir = FILES_DIR / subject_id / level_id
+    if section_id:
+        dest_dir = dest_dir / section_id
+    elif is_archive:
+        dest_dir = dest_dir / 'archive'
+    elif file_type in ('trafficLights', 'studyNotes', 'dataBooklets', 'formulaSheets', 'questionMaps'):
+        dest_dir = dest_dir / file_type
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_path = dest_dir / filename
+
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            dest_path.write_bytes(resp.read())
+    except Exception as e:
+        return jsonify({'error': f'Could not fetch URL: {e}'}), 400
+
+    web_path = '/' + str(dest_path.relative_to(FILES_DIR.parent)).replace('\\', '/')
+    return jsonify({'status': 'ok', 'path': web_path, 'filename': filename})
+
+
+# ── Serve uploaded files (dev only) ─────────────────────────────────────────
+@app.route('/files/<path:filepath>')
+def serve_file(filepath):
+    return send_from_directory(FILES_DIR, filepath)
+
+
+# ── Build ─────────────────────────────────────────────────────────────────────
+@app.route('/api/build', methods=['POST'])
+def build_site():
+    try:
+        result = subprocess.run(
+            ['python', str(BUILDER)],
+            capture_output=True, text=True, cwd=str(BASE_DIR)
+        )
+        if result.returncode != 0:
+            return jsonify({'status': 'error', 'message': result.stderr}), 500
+        return jsonify({'status': 'ok', 'output': result.stdout})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ── Preview server ───────────────────────────────────────────────────────────
+PREVIEW_PORT   = 5050
+PREVIEW_SCRIPT = Path(__file__).parent / 'preview_server.py'
+_PREVIEW_PID_FILE  = Path(tempfile.gettempdir()) / 'jabchem_preview.pid'
+_PREVIEW_PORT_FILE = Path(tempfile.gettempdir()) / 'jabchem_preview.port'
+
+
+def _get_local_ip():
+    """Return the machine's LAN IP, falling back to localhost."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(('8.8.8.8', 80))
+            return s.getsockname()[0]
+    except Exception:
+        return 'localhost'
+
+
+def _find_free_port(start=5050):
+    """Find an available port starting from `start`."""
+    for port in range(start, start + 20):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                s.bind(('0.0.0.0', port))
+                return port
+            except OSError:
+                continue
+    return start
+
+
+def _stop_preview():
+    """Kill the running preview subprocess if one exists."""
+    if _PREVIEW_PID_FILE.exists():
+        try:
+            pid = int(_PREVIEW_PID_FILE.read_text().strip())
+            os.kill(pid, 9)
+        except (ProcessLookupError, ValueError, OSError):
+            pass
+        try:
+            _PREVIEW_PID_FILE.unlink()
+            _PREVIEW_PORT_FILE.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _preview_port():
+    """Return the port of the running preview server, or None."""
+    if not _PREVIEW_PID_FILE.exists():
+        return None
+    try:
+        pid = int(_PREVIEW_PID_FILE.read_text().strip())
+        os.kill(pid, 0)  # Raises if process is dead
+        if _PREVIEW_PORT_FILE.exists():
+            return int(_PREVIEW_PORT_FILE.read_text().strip())
+    except (ProcessLookupError, ValueError, OSError):
+        pass
+    return None
+
+
+@app.route('/api/preview', methods=['POST'])
+def preview_site():
+    """Build the site then start (or restart) a local preview server."""
+    # 1. Build
+    result = subprocess.run(
+        ['python', str(BUILDER)],
+        capture_output=True, text=True, cwd=str(BASE_DIR)
+    )
+    if result.returncode != 0:
+        return jsonify({'status': 'error', 'message': 'Build failed:\n' + result.stderr}), 500
+
+    # 2. Kill any existing preview process
+    _stop_preview()
+
+    # 3. Start a fresh preview subprocess on a free port
+    port = _find_free_port(PREVIEW_PORT)
+    proc = subprocess.Popen(
+        [sys.executable, str(PREVIEW_SCRIPT), str(SITE_DIR), str(port)],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+    _PREVIEW_PID_FILE.write_text(str(proc.pid))
+    _PREVIEW_PORT_FILE.write_text(str(port))
+
+    ip = _get_local_ip()
+    return jsonify({
+        'status': 'ok',
+        'port': port,
+        'url': f'http://{ip}:{port}',
+        'pages': result.stdout.strip()
+    })
+
+
+@app.route('/api/preview/status', methods=['GET'])
+def preview_status():
+    """Return whether a preview server is running and on which port."""
+    port = _preview_port()
+    if port:
+        ip = _get_local_ip()
+        return jsonify({'running': True, 'port': port, 'url': f'http://{ip}:{port}'})
+    return jsonify({'running': False})
+
+
+@app.route('/api/preview/stop', methods=['POST'])
+def stop_preview():
+    _stop_preview()
+    return jsonify({'status': 'ok'})
+
+
+# ── Publish to GitHub ────────────────────────────────────────────────────────
+@app.route('/api/publish', methods=['POST'])
+def publish():
+    import git
+
+    token   = os.getenv('GITHUB_TOKEN', '')
+    repo_id = os.getenv('GITHUB_REPO', '')   # e.g. yourusername/jabchem
+
+    if not token or not repo_id:
+        return jsonify({'error': 'GITHUB_TOKEN and GITHUB_REPO must be set in .env'}), 400
+
+    message = request.json.get('message', f'Content update {datetime.now().strftime("%Y-%m-%d %H:%M")}')
+
+    try:
+        # Build first
+        build_result = subprocess.run(
+            ['python', str(BUILDER)],
+            capture_output=True, text=True, cwd=str(BASE_DIR)
+        )
+        if build_result.returncode != 0:
+            return jsonify({'status': 'error', 'message': 'Build failed: ' + build_result.stderr}), 500
+
+        # Push via git
+        repo = git.Repo(str(BASE_DIR))
+        repo.git.add('site/')
+        repo.git.add('content/content.json')
+
+        if repo.is_dirty(index=True):
+            repo.index.commit(message)
+            origin = repo.remote('origin')
+            # Inject token into remote URL
+            remote_url = f"https://{token}@github.com/{repo_id}.git"
+            with repo.git.custom_environment(GIT_ASKPASS='echo'):
+                repo.git.push('--set-upstream', remote_url, 'HEAD:main')
+
+        return jsonify({'status': 'ok', 'message': 'Pushed to GitHub successfully'})
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ── Stats ─────────────────────────────────────────────────────────────────────
+@app.route('/api/stats', methods=['GET'])
+def get_stats():
+    pdf_count = len(list(FILES_DIR.rglob('*.pdf')))
+    return jsonify({'pdfCount': pdf_count})
+
+
+# ── Subject nav order ─────────────────────────────────────────────────────────
+@app.route('/api/nav-order', methods=['PUT'])
+def update_nav_order():
+    content = read_content()
+    content['site']['nav']['subjectOrder'] = request.json.get('order', [])
+    write_content(content)
+    return jsonify({'status': 'ok'})
+
+
+if __name__ == '__main__':
+    print("\n  JABchem Admin\n  Running at: http://localhost:5000\n")
+    app.run(debug=True, port=5000, host="0.0.0.0")

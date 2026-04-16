@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}{{ site.title }} — {{ site.tagline }}{% endblock %}
+{% block description %}{{ site.description }}{% endblock %}
+
+{% block full_width %}
+<div class="home-hero">
+  <div class="home-hero-inner">
+    <h1>{{ site.title }}</h1>
+    <p class="home-hero-sub">{{ site.tagline }}</p>
+    <p class="home-hero-count"><span class="home-hero-num">{{ total_pdfs }}+</span> resources across {{ subjects | selectattr('published') | list | length }} subjects</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+  .home-hero-btns { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+  .hero-btn-primary { display: inline-flex; align-items: center; gap: 7px; padding: 10px 20px; border-radius: 7px; font-size: 14px; font-weight: 600; background: white; color: {{ site.theme.navBackground }}; text-decoration: none; transition: opacity 0.15s; }
+  .hero-btn-primary:hover { opacity: 0.9; }
+  .hero-btn-secondary { display: inline-flex; align-items: center; gap: 7px; padding: 10px 20px; border-radius: 7px; font-size: 14px; font-weight: 600; background: rgba(255,255,255,0.12); color: white; border: 1.5px solid rgba(255,255,255,0.3); text-decoration: none; transition: background 0.15s; }
+  .hero-btn-secondary:hover { background: rgba(255,255,255,0.2); }
+  .feedback-banner { margin-top: 32px; border-radius: var(--radius-xl); padding: 22px 28px; display: flex; align-items: center; gap: 20px; background: linear-gradient(135deg, #1d6fa4 0%, #1a1a2e 100%); position: relative; overflow: hidden; }
+  .feedback-banner::before { content: ''; position: absolute; top: -60%; right: -4%; width: 220px; height: 220px; border-radius: 50%; background: rgba(255,255,255,0.05); pointer-events: none; }
+  .feedback-banner::after { content: ''; position: absolute; bottom: -80%; right: 22%; width: 160px; height: 160px; border-radius: 50%; background: rgba(255,255,255,0.04); pointer-events: none; }
+  .feedback-banner-icon { width: 42px; height: 42px; border-radius: 11px; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px; color: white; }
+  .feedback-banner-body { flex: 1; min-width: 0; }
+  .feedback-banner-body p { font-size: 14px; color: rgba(255,255,255,0.85); line-height: 1.5; margin: 0; }
+  .feedback-banner-link { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 7px; font-size: 13px; font-weight: 600; background: rgba(255,255,255,0.15); color: white; border: 1.5px solid rgba(255,255,255,0.25); text-decoration: none; white-space: nowrap; flex-shrink: 0; transition: background 0.15s; }
+  .feedback-banner-link:hover { background: rgba(255,255,255,0.25); }
+  @media (max-width: 560px) { .feedback-banner { flex-direction: column; align-items: flex-start; gap: 14px; } }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if site.hero and site.hero.published and (site.hero.heading or site.hero.text) %}
+<div class="subject-hero" style="background:{{ site.theme.navBackground }}; margin-bottom:32px">
+  <div class="subject-hero-icon">
+    <i class="fa fa-bullhorn"></i>
+  </div>
+  <h1>{{ site.hero.heading }}</h1>
+  {% if site.hero.text %}<p>{{ site.hero.text }}</p>{% endif %}
+  {% if site.hero.primaryBtn.label or site.hero.secondaryBtn.label %}
+  <div class="home-hero-btns">
+    {% if site.hero.primaryBtn.label %}
+    <a href="{{ site.hero.primaryBtn.url or '#subjects' }}" class="hero-btn-primary">
+      {{ site.hero.primaryBtn.label }} <i class="fa fa-arrow-right" style="font-size:12px"></i>
+    </a>
+    {% endif %}
+    {% if site.hero.secondaryBtn.label %}
+    <a href="{{ site.hero.secondaryBtn.url or '#' }}" class="hero-btn-secondary">
+      {{ site.hero.secondaryBtn.label }}
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="section-heading" id="subjects"><h2>Choose a subject</h2></div>
+<div class="subject-grid">
+  {% for s in subjects if s.published %}
+  <a href="/{{ s.slug }}/" class="subject-card" style="--card-accent: {{ s.colour }}">
+    <div class="subject-card-icon" style="background: {{ s.colour }}18">
+      <i class="fa {{ s.icon.fa }}" style="color: {{ s.colour }}"></i>
+    </div>
+    <h2>{{ s.title }}</h2>
+    <p>{{ s.description }}</p>
+    <div class="subject-card-footer">
+      {% for level in s.levels if level.published %}
+      <span class="subject-card-tag">{{ level.shortTitle }}</span>
+      {% endfor %}
+      <span class="subject-card-tag" style="background:{{ s.colour }}18; color:{{ s.colour }}; border-color:{{ s.colour }}30">{{ subject_pdfs[s.slug] }} resources</span>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+{% if site.feedbackBanner and site.feedbackBanner.published %}
+<div class="feedback-banner">
+  <div class="feedback-banner-icon"><i class="fa fa-comment-dots"></i></div>
+  <div class="feedback-banner-body">
+    <p>{{ site.feedbackBanner.text }}</p>
+  </div>
+  {% if site.feedbackBanner.linkLabel %}
+  <a href="{{ site.feedbackBanner.linkUrl or '#' }}" class="feedback-banner-link">
+    {{ site.feedbackBanner.linkLabel }} <i class="fa fa-arrow-right" style="font-size:11px"></i>
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}{{ level.title }} {{ subject.title }}{% endblock %}
+{% block description %}{{ level.description }}{% endblock %}
+{% block extra_styles %}
+<style>
+  :root {
+    --accent: {{ subject.colour }};
+    --accent-pale: {{ subject.colour }}18;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="level-header">
+  <a href="/{{ subject.slug }}/" class="level-header-subject">
+    <div class="level-header-icon" style="background:{{ subject.colour }}18">
+      <i class="fa {{ subject.icon.fa }}" style="color:{{ subject.colour }}"></i>
+    </div>
+    {{ subject.title }}
+  </a>
+  <i class="fa fa-chevron-right level-header-sep"></i>
+  <div class="level-header-pills">
+    {% for lv in subject.levels if lv.published %}
+    <a href="/{{ subject.slug }}/{{ lv.slug }}/" class="level-pill{% if lv.id == level.id %} active{% endif %}">{{ lv.title }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="level-layout">
+
+  {# ── Main content ──────────────────────────────────────────────────────── #}
+  <div class="level-sections">
+  {% for section in level.sections if section %}
+  {% set rt = section.resourceType %}
+  {% set papers = section.papers | selectattr('published') | list if section.papers else [] %}
+  {% set items  = section['items'] | selectattr('published') | list if 'items' in section else [] %}
+  {% set rows   = section.rows | selectattr('published') | list if section.rows else [] %}
+
+  <div class="section-block" id="{{ section.id }}">
+
+  {# ── Past papers ────────────────────────────────────────────────────── #}
+  {% if rt == 'pastPapers' %}
+    {% if papers %}
+    <div class="section-heading"><h2>{{ section.title }}</h2></div>
+    <div class="paper-table-wrap">
+      <table class="paper-table">
+        <thead>
+          <tr>
+            <th class="col-year">Year</th>
+            {% if subject.paperStructure %}
+              {% for part in subject.paperStructure.parts %}<th>{{ part.label }}</th>{% endfor %}
+            {% else %}
+              <th class="col-paper">Paper PDF</th>
+            {% endif %}
+            {% if section.jabchemMarkingScheme != false %}<th class="col-ms">JABchem MS</th>{% endif %}
+            <th class="col-ms">SQA MS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for paper in papers %}
+          <tr>
+            <td><span class="year-badge">{{ paper.year }}</span>{% if paper.label %} <span class="year-label">{{ paper.label }}</span>{% endif %}</td>
+            {% if subject.paperStructure %}
+              {% for part in subject.paperStructure.parts %}
+              <td>{% if paper[part.id] %}<a href="{{ paper[part.id] }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> Paper</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
+              {% endfor %}
+            {% else %}
+            <td>{% if paper.paper %}<a href="{{ paper.paper }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> Paper</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
+            {% endif %}
+            {% if section.jabchemMarkingScheme != false %}
+            <td>{% if paper.jabchemMarkingScheme %}<a href="{{ paper.jabchemMarkingScheme }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-check-circle"></i> JABchem</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
+            {% endif %}
+            <td>{% if paper.markingScheme %}<a href="{{ paper.markingScheme }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> SQA</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+  {# ── Archive (collapsible) ───────────────────────────────────────────── #}
+  {% elif rt == 'archive' %}
+    {% if papers %}
+    <details>
+      <summary class="archive-summary">
+        <i class="fa fa-box-archive" style="font-size:13px"></i>
+        {{ section.title }}
+        <span class="archive-count">{{ papers | length }}</span>
+        <i class="fa fa-chevron-down archive-chevron"></i>
+      </summary>
+      <div style="margin-top:12px">
+        <div class="paper-table-wrap">
+          <table class="paper-table">
+            <thead>
+              <tr>
+                <th class="col-year">Year</th>
+                {% if subject.paperStructure %}
+                  {% for part in subject.paperStructure.parts %}<th>{{ part.label }}</th>{% endfor %}
+                {% else %}
+                  <th class="col-paper">Paper PDF</th>
+                {% endif %}
+                {% if section.jabchemMarkingScheme != false %}<th class="col-ms">JABchem MS</th>{% endif %}
+                <th class="col-ms">SQA MS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for paper in papers %}
+              <tr>
+                <td><span class="year-badge">{{ paper.year }}</span>{% if paper.label %} <span class="year-label">{{ paper.label }}</span>{% endif %}</td>
+                {% if subject.paperStructure %}
+                  {% for part in subject.paperStructure.parts %}
+                  <td>{% if paper[part.id] %}<a href="{{ paper[part.id] }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> Paper</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
+                  {% endfor %}
+                {% else %}
+                <td>{% if paper.paper %}<a href="{{ paper.paper }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> Paper</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
+                {% endif %}
+                {% if section.jabchemMarkingScheme != false %}
+                <td>{% if paper.jabchemMarkingScheme %}<a href="{{ paper.jabchemMarkingScheme }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-check-circle"></i> JABchem</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
+                {% endif %}
+                <td>{% if paper.markingScheme %}<a href="{{ paper.markingScheme }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> SQA</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+    {% endif %}
+
+  {# ── Custom table ────────────────────────────────────────────────────── #}
+  {% elif rt == 'customTable' %}
+    {% set columns = section.columns if section.columns else [] %}
+    {% if columns and rows %}
+    <div class="section-heading"><h2>{{ section.title }}</h2></div>
+    {% if section.description %}<p class="section-description">{{ section.description }}</p>{% endif %}
+    <div class="paper-table-wrap">
+      <table class="paper-table">
+        <thead>
+          <tr>
+            <th style="width:44px">#</th>
+            {% for col in columns %}<th>{{ col.label }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td>{{ row.number if row.number else loop.index }}</td>
+            {% for col in columns %}
+            <td>
+              {% set val = row[col.id] if col.id in row else none %}
+              {% if col.type == 'text' %}{{ val or '' }}
+              {% elif col.type == 'file' %}
+                {% if val and val.file %}<a href="{{ val.file }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> {{ val.label or 'Download' }}</a>{% endif %}
+              {% elif col.type == 'files' %}
+                {% if val %}<div class="ct-files">{% for f in val %}{% if f.file %}<a href="{{ f.file }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> {{ f.label or 'Download' }}</a>{% endif %}{% endfor %}</div>{% endif %}
+              {% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if section.footnote %}<p class="section-footnote">{{ section.footnote }}</p>{% endif %}
+    {% endif %}
+
+  {# ── Resource items (traffic lights, study notes, etc.) ─────────────── #}
+  {% else %}
+    {% if items %}
+    <div class="section-heading"><h2>{{ section.title }}</h2></div>
+    <div class="resource-list">
+      {% for item in items %}
+      <div class="resource-item">
+        <span class="resource-item-title">{{ item.title }}</span>
+        {% if item.file %}
+        <a href="{{ item.file }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener">
+          <i class="fa fa-file-pdf"></i> Download
+        </a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endif %}
+
+  </div>{# /section-block #}
+  {% endfor %}
+  </div>{# /level-sections #}
+
+  {# ── On this page nav ──────────────────────────────────────────────────── #}
+  <aside class="level-toc">
+    <div class="toc-inner">
+      <p class="toc-label">On this page</p>
+      {% for section in level.sections if section %}
+      <a href="#{{ section.id }}" class="toc-link">{{ section.title }}</a>
+      {% endfor %}
+    </div>
+  </aside>
+
+</div>{# /level-layout #}
+
+<script>
+  (function () {
+    const sections = document.querySelectorAll('.section-block[id]');
+    const links = document.querySelectorAll('.toc-link');
+    if (!sections.length || !links.length) return;
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          links.forEach(l => l.classList.remove('active'));
+          const a = document.querySelector('.toc-link[href="#' + entry.target.id + '"]');
+          if (a) a.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-10% 0px -80% 0px' });
+    sections.forEach(s => observer.observe(s));
+  })();
+</script>
+
+{% endblock %}

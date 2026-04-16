@@ -1,0 +1,2611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JABchem Admin</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+  :root {
+    --bg: #f8f8f8;
+    --surface: #ffffff;
+    --sidebar-bg: #1a1a2e;
+    --sidebar-text: rgba(255,255,255,0.7);
+    --sidebar-active: rgba(255,255,255,0.12);
+    --sidebar-active-text: #ffffff;
+    --border: #e5e5e5;
+    --text: #1a1a1a;
+    --text-muted: #6b7280;
+    --text-light: #9ca3af;
+    --primary: #534AB7;
+    --primary-light: #EEEDFE;
+    --primary-dark: #3C3489;
+    --success: #1D9E75;
+    --success-light: #E1F5EE;
+    --warning: #BA7517;
+    --warning-light: #FAEEDA;
+    --danger: #E24B4A;
+    --danger-light: #FCEBEB;
+    --info: #378ADD;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', -apple-system, sans-serif; font-size: 14px; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+
+  /* ── Sidebar ── */
+  .sidebar { width: 220px; min-width: 220px; background: var(--sidebar-bg); display: flex; flex-direction: column; height: 100vh; }
+  .sidebar-logo { padding: 20px 18px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .sidebar-logo h1 { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
+  .sidebar-logo p { font-size: 11px; color: var(--sidebar-text); margin-top: 2px; }
+
+  .sidebar-section { padding: 16px 14px 4px; font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .subject-item { display: flex; align-items: center; gap: 10px; padding: 9px 14px; cursor: pointer; color: var(--sidebar-text); border-radius: 6px; margin: 1px 8px; transition: all 0.1s; }
+  .subject-item:hover { background: var(--sidebar-active); color: var(--sidebar-active-text); }
+  .subject-item.active { background: var(--sidebar-active); color: var(--sidebar-active-text); }
+  .subject-item .subject-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .subject-item .subject-name { flex: 1; font-size: 13px; }
+  .subject-item .subject-badge { font-size: 10px; background: rgba(255,255,255,0.12); padding: 1px 6px; border-radius: 10px; color: rgba(255,255,255,0.6); }
+
+  .sidebar-add { margin: 6px 8px; padding: 8px 14px; border: 1px dashed rgba(255,255,255,0.2); border-radius: 6px; color: rgba(255,255,255,0.45); font-size: 12px; cursor: pointer; text-align: center; background: none; width: calc(100% - 16px); }
+  .sidebar-add:hover { border-color: rgba(255,255,255,0.4); color: rgba(255,255,255,0.7); }
+
+  .sidebar-nav { margin-top: auto; border-top: 1px solid rgba(255,255,255,0.08); padding: 8px; }
+  .sidebar-nav-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; color: var(--sidebar-text); cursor: pointer; border-radius: 6px; font-size: 12px; }
+  .sidebar-nav-item:hover { background: var(--sidebar-active); color: var(--sidebar-active-text); }
+  .sidebar-nav-item i { width: 14px; font-size: 12px; }
+
+  /* ── Main ── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .topbar { padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-shrink: 0; }
+  .topbar-left { display: flex; align-items: center; gap: 8px; }
+  .breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); }
+  .breadcrumb .current { color: var(--text); font-weight: 500; }
+  .topbar-right { display: flex; align-items: center; gap: 8px; }
+
+  .content-area { flex: 1; overflow-y: auto; padding: 24px; }
+
+  /* ── Level tabs ── */
+  .level-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .level-tab { padding: 7px 16px; border: 1px solid var(--border); border-radius: 20px; font-size: 13px; cursor: pointer; background: var(--surface); color: var(--text-muted); transition: all 0.1s; display: inline-flex; align-items: center; gap: 4px; }
+  .level-tab:hover { border-color: var(--primary); color: var(--primary); }
+  .level-tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+  .level-tab .tab-icon-btn { font-size: 10px; padding: 1px 3px; border-radius: 3px; cursor: pointer; background: none; border: none; line-height: 1; color: rgba(255,255,255,0.6); font-family: inherit; }
+  .level-tab.active .tab-icon-btn:hover { color: white; background: rgba(255,255,255,0.2); }
+  .level-tab.active .tab-icon-btn.del:hover { color: white; background: rgba(255,80,80,0.4); }
+
+  /* ── Section tabs (replace old resource tabs) ── */
+  .resource-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 16px; gap: 0; align-items: center; flex-wrap: wrap; }
+  .resource-tab { padding: 8px 14px; font-size: 13px; cursor: pointer; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; display: flex; align-items: center; gap: 6px; }
+  .resource-tab:hover { color: var(--text); }
+  .resource-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 500; }
+  .resource-tab .tab-icon-btn { font-size: 10px; padding: 1px 3px; border-radius: 3px; cursor: pointer; color: var(--text-light); background: none; border: none; line-height: 1; }
+  .resource-tab .tab-icon-btn:hover { color: var(--text); background: #f3f4f6; }
+  .resource-tab .tab-icon-btn.del:hover { color: var(--danger); background: var(--danger-light); }
+  .resource-tab-add { padding: 4px 10px; margin: 0 4px 1px; border-radius: 6px; font-size: 12px; cursor: pointer; border: 1px dashed var(--border); background: none; color: var(--text-muted); font-family: inherit; }
+  .resource-tab-add:hover { border-color: var(--primary); color: var(--primary); }
+
+  /* ── Cards ── */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 16px; }
+  .card-header { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .card-header h3 { font-size: 13px; font-weight: 500; }
+  .card-body { padding: 0; }
+
+  /* ── Table ── */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th { font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; padding: 7px 12px; text-align: left; background: #fafafa; border-bottom: 1px solid var(--border); }
+  .data-table td { padding: 7px 12px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: #fafafa; }
+  .file-link { color: var(--info); font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+  .file-link:hover { text-decoration: underline; }
+  .missing { font-size: 12px; color: var(--text-light); font-style: italic; }
+
+  /* ── Upload zone ── */
+  .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 24px; text-align: center; cursor: pointer; background: #fafafa; transition: all 0.15s; margin-bottom: 16px; }
+  .upload-zone:hover, .upload-zone.drag-over { border-color: var(--primary); background: var(--primary-light); }
+  .upload-zone i { font-size: 24px; color: var(--text-light); margin-bottom: 8px; display: block; }
+  .upload-zone p { font-size: 13px; color: var(--text-muted); }
+  .upload-zone strong { font-size: 14px; color: var(--text); }
+  .upload-zone .path-preview { font-family: monospace; font-size: 11px; color: var(--text-light); margin-top: 6px; }
+
+  /* ── Badges ── */
+  .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+  .badge-green { background: var(--success-light); color: var(--success); }
+  .badge-amber { background: var(--warning-light); color: var(--warning); }
+  .badge-gray { background: #f3f4f6; color: var(--text-muted); }
+  .badge-hidden { background: #f3f4f6; color: var(--text-light); }
+
+  /* ── Buttons ── */
+  .btn { padding: 7px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); display: inline-flex; align-items: center; gap: 6px; transition: all 0.1s; }
+  .btn:hover { background: #f9f9f9; border-color: #ccc; }
+  .btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
+  .btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+  .btn-success { background: var(--success); color: white; border-color: var(--success); }
+  .btn-success:hover { background: #0f6e56; }
+  .btn-danger { background: transparent; color: var(--danger); border-color: #fca5a5; }
+  .btn-danger:hover { background: var(--danger-light); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-publish { background: #1a1a2e; color: white; border-color: #1a1a2e; }
+  .btn-publish:hover { background: #0f0f1e; }
+  .icon-btn { background: none; border: none; cursor: pointer; padding: 4px 6px; border-radius: 4px; color: var(--text-muted); font-size: 13px; }
+  .icon-btn:hover { background: #f3f4f6; color: var(--text); }
+  .icon-btn.danger:hover { background: var(--danger-light); color: var(--danger); }
+
+  /* ── Subject header ── */
+  .subject-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding: 16px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+  .subject-header .subject-icon-lg { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .subject-header h2 { font-size: 20px; font-weight: 600; }
+  .subject-header p { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+  .subject-header .header-actions { margin-left: auto; display: flex; gap: 8px; }
+
+  /* ── Deploy bar ── */
+  .deploy-bar { padding: 12px 20px; background: #1a1a2e; color: rgba(255,255,255,0.8); display: flex; align-items: center; gap: 12px; font-size: 13px; flex-shrink: 0; }
+  .deploy-bar .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #1D9E75; flex-shrink: 0; }
+  .deploy-bar .changes-count { background: rgba(255,255,255,0.15); padding: 1px 8px; border-radius: 10px; font-size: 12px; margin-left: 4px; }
+  .deploy-bar .spacer { flex: 1; }
+  .deploy-bar .btn-deploy { background: rgba(255,255,255,0.12); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  .deploy-bar .btn-deploy:hover { background: rgba(255,255,255,0.2); }
+
+  /* ── Home screen ── */
+  .home-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; }
+  .stat-card .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+  .stat-card .stat-value { font-size: 28px; font-weight: 600; }
+  .subject-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .subject-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; cursor: pointer; transition: all 0.1s; }
+  .subject-card:hover { border-color: var(--primary); transform: translateY(-1px); box-shadow: var(--shadow); }
+  .subject-card .sc-icon { width: 38px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; margin-bottom: 10px; }
+  .subject-card h3 { font-size: 15px; font-weight: 500; }
+  .subject-card p { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+
+  /* ── Modal ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+  .modal { background: var(--surface); border-radius: var(--radius-lg); width: 480px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+  .modal-header { padding: 18px 20px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .modal-header h3 { font-size: 16px; font-weight: 600; }
+  .modal-body { padding: 20px; }
+  .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+  /* ── Forms ── */
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; }
+  .form-group input[type=text], .form-group input[type=number], .form-group input[type=url],
+  .form-group select, .form-group textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; color: var(--text); background: var(--surface); font-family: inherit; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(83,74,183,0.1); }
+  .form-group .hint { font-size: 11px; color: var(--text-light); margin-top: 4px; }
+  .form-group .path-preview { font-family: monospace; font-size: 11px; background: #f3f4f6; padding: 5px 8px; border-radius: 4px; color: var(--text-muted); margin-top: 4px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-group input[type=file] { padding: 6px; font-size: 12px; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; cursor: pointer; }
+  .checkbox-row input { cursor: pointer; }
+  .toggle { position: relative; width: 34px; height: 20px; display: inline-block; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; background: #d1d5db; border-radius: 20px; cursor: pointer; transition: background 0.15s; }
+  .toggle input:checked + .toggle-slider { background: var(--primary); }
+  .toggle-slider:before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: transform 0.15s; }
+  .toggle input:checked + .toggle-slider:before { transform: translateX(14px); }
+  .resource-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .resource-toggle-row:last-child { border-bottom: none; }
+  .resource-toggle-info strong { font-size: 13px; font-weight: 500; display: block; }
+  .resource-toggle-info span { font-size: 11px; color: var(--text-muted); }
+
+  /* ── Colour swatches ── */
+  .colour-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .colour-swatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform 0.1s; }
+  .colour-swatch:hover { transform: scale(1.15); }
+  .colour-swatch.selected { border-color: var(--text); }
+
+  /* ── Notification ── */
+  .notification { position: fixed; bottom: 24px; right: 24px; background: #1a1a2e; color: white; padding: 12px 18px; border-radius: var(--radius); font-size: 13px; font-weight: 500; z-index: 2000; transform: translateY(8px); opacity: 0; transition: all 0.2s; pointer-events: none; display: flex; align-items: center; gap: 8px; }
+  .notification.show { transform: translateY(0); opacity: 1; }
+  .notification.success { background: var(--success); }
+  .notification.error { background: var(--danger); }
+
+  /* ── Settings page ── */
+  .settings-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 16px; }
+  .settings-section-head { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid var(--border); }
+  .settings-section-head h3 { font-size: 13px; font-weight: 500; }
+  .settings-section-head p { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .settings-section-body { padding: 16px; }
+  .danger-section { border-color: #fca5a5; }
+  .danger-section .settings-section-head { background: var(--danger-light); border-bottom-color: #fca5a5; }
+
+  /* ── Loading ── */
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+  .empty-state i { font-size: 32px; margin-bottom: 12px; display: block; opacity: 0.3; }
+  .empty-state p { font-size: 13px; }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  #view-home, #view-subject, #view-settings { display: none; }
+  #view-home.active, #view-subject.active, #view-settings.active { display: block; }
+
+  /* ── Section tabs ── */
+  .section-tabs { display: flex; align-items: center; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: #fafafa; flex-wrap: wrap; }
+  .section-tab { padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; background: white; border: 1px solid var(--border); color: var(--text-muted); display: inline-flex; align-items: center; gap: 5px; transition: all 0.1s; }
+  .section-tab:hover { border-color: var(--primary); color: var(--primary); }
+  .section-tab.active { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+  .section-tab-del { font-size: 10px; padding: 0 0 0 2px; cursor: pointer; color: var(--text-light); line-height: 1; }
+  .section-tab-del:hover { color: var(--danger); }
+  .section-tab-add { padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; border: 1px dashed var(--border); background: none; color: var(--text-muted); font-family: inherit; }
+  .section-tab-add:hover { border-color: var(--primary); color: var(--primary); background: none; }
+  .url-or-divider { display: flex; align-items: center; gap: 8px; margin: 6px 0 5px; color: var(--text-light); font-size: 11px; }
+  .url-or-divider::before, .url-or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .url-fetch-input { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px; color: var(--text); background: var(--surface); font-family: inherit; }
+  .url-fetch-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(83,74,183,0.1); }
+  .nav-order-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); margin-bottom: 6px; cursor: grab; user-select: none; transition: background 0.1s; }
+  .nav-order-item:active { cursor: grabbing; }
+  .nav-order-item.drag-over { border-color: var(--primary); background: var(--primary-light); }
+  .nav-order-item.dragging { opacity: 0.4; }
+
+  /* ── Column editor ── */
+  .col-editor-row { display: flex; align-items: center; gap: 8px; padding: 8px; background: #fafafa; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; }
+  .col-editor-row input[type=text] { flex: 1; padding: 5px 8px; border: 1px solid var(--border); border-radius: 5px; font-size: 12px; background: var(--surface); color: var(--text); font-family: inherit; }
+  .col-editor-row select { flex: 0 0 130px; padding: 5px 6px; border: 1px solid var(--border); border-radius: 5px; font-size: 12px; background: var(--surface); color: var(--text); font-family: inherit; }
+  /* ── Row file entries (files-type column in row modal) ── */
+  .row-file-entry { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; margin-bottom: 8px; background: #fafafa; }
+  .row-file-entry .entry-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .row-file-entry .entry-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .row-file-entry input[type=text] { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 5px; font-size: 12px; margin-bottom: 6px; font-family: inherit; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <h1>JABchem</h1>
+    <p>Content Admin</p>
+  </div>
+  <div class="sidebar-section">Subjects</div>
+  <div id="subject-list"></div>
+  <button class="sidebar-add" onclick="openModal('modal-add-subject')">
+    <i class="fa fa-plus"></i> Add new subject
+  </button>
+  <div class="sidebar-nav">
+    <div class="sidebar-nav-item" onclick="showView('home')">
+      <i class="fa fa-home"></i> Dashboard
+    </div>
+    <div class="sidebar-nav-item" onclick="showView('settings')">
+      <i class="fa fa-cog"></i> Site settings
+    </div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="breadcrumb" id="breadcrumb">
+        <span class="current">Dashboard</span>
+      </div>
+    </div>
+    <div class="topbar-right" id="topbar-actions"></div>
+  </div>
+
+  <div class="content-area" id="content-area">
+    <!-- Home View -->
+    <div id="view-home" class="active">
+      <div class="home-grid" id="home-stats"></div>
+      <div style="font-size:12px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">Subjects</div>
+      <div class="subject-card-grid" id="home-subject-cards"></div>
+    </div>
+
+    <!-- Subject View -->
+    <div id="view-subject">
+      <div class="subject-header" id="subject-header"></div>
+      <div class="level-tabs" id="level-tabs"></div>
+      <div class="resource-tabs" id="section-tabs"></div>
+      <div id="resource-content"></div>
+    </div>
+
+    <!-- Settings View -->
+    <div id="view-settings">
+      <div id="settings-content"></div>
+    </div>
+  </div>
+
+  <div class="deploy-bar">
+    <div class="status-dot"></div>
+    <span id="deploy-status-text">Ready to publish</span>
+    <span class="changes-count" id="changes-count" style="display:none"></span>
+    <div id="preview-indicator" style="display:none;align-items:center;gap:7px;font-size:12px;background:rgba(255,255,255,0.1);padding:4px 12px;border-radius:6px">
+      <span style="width:7px;height:7px;border-radius:50%;background:#1D9E75;display:inline-block;animation:pulse 2s infinite"></span>
+      Preview running —
+      <a id="preview-link" href="#" target="_blank" style="color:white;font-weight:500;text-decoration:underline">open</a>
+      <button onclick="stopPreview()" style="background:none;border:none;color:rgba(255,255,255,0.5);cursor:pointer;font-size:11px;padding:0 0 0 4px">✕ stop</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn-deploy" onclick="openPreviewModal()" style="margin-right:6px;background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.15)">
+      <i class="fa fa-eye"></i> Preview locally
+    </button>
+    <button class="btn-deploy" onclick="openPublishModal()">
+      <i class="fa fa-rocket"></i> Publish to site
+    </button>
+  </div>
+</div>
+
+<!-- ════ MODALS ════ -->
+
+<!-- Add Paper -->
+<div class="modal-overlay" id="modal-add-paper" style="display:none" onclick="closeModalOutside(event,'modal-add-paper')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Add past paper</h3>
+      <button class="icon-btn" onclick="closeModal('modal-add-paper')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Year</label>
+        <input type="number" id="paper-year" value="2025" min="1980" max="2030">
+      </div>
+      <div class="form-group">
+        <label>Subtitle <span style="color:var(--text-light);font-weight:400">(optional)</span></label>
+        <input type="text" id="paper-label" placeholder="e.g. Unused Paper, Specimen">
+        <div class="hint">Use to add a second paper for the same year</div>
+      </div>
+      <div id="paper-fields"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add-paper')">Cancel</button>
+      <button class="btn btn-primary" onclick="savePaper()">Save paper</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Resource -->
+<div class="modal-overlay" id="modal-add-resource" style="display:none" onclick="closeModalOutside(event,'modal-add-resource')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="add-resource-title">Add resource</h3>
+      <button class="icon-btn" onclick="closeModal('modal-add-resource')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" id="resource-title" placeholder="e.g. Unit 1 — Chemical Changes">
+      </div>
+      <div class="form-group">
+        <label>File (PDF)</label>
+        <input type="file" id="resource-file" accept=".pdf">
+        <div class="url-or-divider"><span>or paste URL</span></div>
+        <input type="url" id="resource-url" class="url-fetch-input" placeholder="https://…">
+        <div class="path-preview" id="resource-path-preview">Select a file or paste a URL</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add-resource')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveResource()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Subject -->
+<div class="modal-overlay" id="modal-add-subject" style="display:none" onclick="closeModalOutside(event,'modal-add-subject')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Add new subject</h3>
+      <button class="icon-btn" onclick="closeModal('modal-add-subject')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Subject name</label>
+          <input type="text" id="new-subj-name" placeholder="e.g. Geography" oninput="autoSlug()">
+        </div>
+        <div class="form-group">
+          <label>URL slug</label>
+          <input type="text" id="new-subj-slug">
+          <div class="path-preview" id="new-subj-url">jabchem.org.uk/...</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea id="new-subj-desc" rows="2" placeholder="Brief description shown on the subject page"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Font Awesome icon</label>
+        <input type="text" id="new-subj-icon" value="fa-book" placeholder="fa-book">
+        <div class="hint">Browse icons at <a href="https://fontawesome.com/icons" target="_blank">fontawesome.com/icons</a> — copy the icon name</div>
+      </div>
+      <div class="form-group">
+        <label>Accent colour</label>
+        <div class="colour-row" id="new-subj-colours">
+          <div class="colour-swatch selected" style="background:#534AB7" data-colour="#534AB7" onclick="selectNewColour(this)"></div>
+          <div class="colour-swatch" style="background:#1D9E75" data-colour="#1D9E75" onclick="selectNewColour(this)"></div>
+          <div class="colour-swatch" style="background:#BA7517" data-colour="#BA7517" onclick="selectNewColour(this)"></div>
+          <div class="colour-swatch" style="background:#378ADD" data-colour="#378ADD" onclick="selectNewColour(this)"></div>
+          <div class="colour-swatch" style="background:#D4537E" data-colour="#D4537E" onclick="selectNewColour(this)"></div>
+          <div class="colour-swatch" style="background:#639922" data-colour="#639922" onclick="selectNewColour(this)"></div>
+          <div class="colour-swatch" style="background:#D85A30" data-colour="#D85A30" onclick="selectNewColour(this)"></div>
+          <div class="colour-swatch" style="background:#7F77DD" data-colour="#7F77DD" onclick="selectNewColour(this)"></div>
+        </div>
+        <input type="text" id="new-subj-colour" value="#534AB7" placeholder="#534AB7" style="margin-top:8px">
+      </div>
+      <div class="form-group">
+        <label>Levels</label>
+        <div class="checkbox-row"><label><input type="checkbox" id="lvl-n5" checked> National 5</label></div>
+        <div class="checkbox-row"><label><input type="checkbox" id="lvl-h" checked> Higher</label></div>
+        <div class="checkbox-row"><label><input type="checkbox" id="lvl-ah" checked> Advanced Higher</label></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add-subject')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNewSubject()">Create subject</button>
+    </div>
+  </div>
+</div>
+
+<!-- Preview -->
+<div class="modal-overlay" id="modal-preview" style="display:none" onclick="closeModalOutside(event,'modal-preview')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Preview site locally</h3>
+      <button class="icon-btn" onclick="closeModal('modal-preview')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.7;margin-bottom:16px">
+        This builds your site from the current content and serves it locally so you can check everything looks right before publishing to GitHub.
+      </p>
+      <div id="preview-modal-state-idle">
+        <div style="background:#f9fafb;border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-size:13px;color:var(--text-muted)">
+          <i class="fa fa-info-circle" style="margin-right:6px"></i>
+          The preview opens in a new browser tab at <code style="background:#f3f4f6;padding:1px 5px;border-radius:4px">http://localhost:5050</code>.
+          It stays live until you stop it or close the admin.
+        </div>
+      </div>
+      <div id="preview-modal-state-building" style="display:none;text-align:center;padding:24px 0">
+        <div class="spinner" style="border-color:rgba(83,74,183,0.2);border-top-color:var(--primary);width:28px;height:28px;border-width:3px;margin:0 auto 12px"></div>
+        <p style="font-size:13px;color:var(--text-muted)">Building site…</p>
+        <pre id="preview-build-log" style="margin-top:12px;font-size:11px;font-family:monospace;background:#f3f4f6;padding:10px;border-radius:6px;text-align:left;max-height:160px;overflow-y:auto;color:var(--text-muted);white-space:pre-wrap"></pre>
+      </div>
+      <div id="preview-modal-state-done" style="display:none">
+        <div style="background:var(--success-light);border:1px solid #9FE1CB;border-radius:var(--radius);padding:14px;display:flex;align-items:center;gap:12px">
+          <i class="fa fa-check-circle" style="color:var(--success);font-size:20px;flex-shrink:0"></i>
+          <div>
+            <p style="font-size:13px;font-weight:500;color:#0f6e56;margin-bottom:3px">Preview is live!</p>
+            <a id="preview-open-link" href="#" target="_blank" style="font-size:13px;color:var(--success);font-weight:500;text-decoration:underline"></a>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:10px">
+          <i class="fa fa-lightbulb" style="margin-right:4px"></i>
+          The preview updates each time you click "Preview locally" — it always reflects your latest content.
+        </p>
+      </div>
+      <div id="preview-modal-state-error" style="display:none">
+        <div style="background:var(--danger-light);border:1px solid #fca5a5;border-radius:var(--radius);padding:14px">
+          <p style="font-size:13px;font-weight:500;color:var(--danger);margin-bottom:6px"><i class="fa fa-exclamation-circle"></i> Build failed</p>
+          <pre id="preview-error-log" style="font-size:11px;font-family:monospace;color:#7f1d1d;white-space:pre-wrap;max-height:140px;overflow-y:auto"></pre>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" id="preview-modal-footer">
+      <button class="btn" onclick="closeModal('modal-preview')">Close</button>
+      <button class="btn btn-primary" id="btn-do-preview" onclick="doPreview()">
+        <i class="fa fa-hammer"></i> Build &amp; preview
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Publish -->
+<div class="modal-overlay" id="modal-publish" style="display:none" onclick="closeModalOutside(event,'modal-publish')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Publish to site</h3>
+      <button class="icon-btn" onclick="closeModal('modal-publish')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.6">
+        This will build the static site from your content and push it to GitHub.
+        Cloudflare will automatically publish it within ~30 seconds.
+      </p>
+      <div class="form-group">
+        <label>Commit message (optional)</label>
+        <input type="text" id="publish-message" placeholder="e.g. Add 2025 N5 Chemistry papers">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-publish')">Cancel</button>
+      <button class="btn btn-publish" id="btn-do-publish" onclick="doPublish()">
+        <i class="fa fa-rocket"></i> Push to GitHub &amp; publish
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Subject settings -->
+<div class="modal-overlay" id="modal-subject-settings" style="display:none" onclick="closeModalOutside(event,'modal-subject-settings')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="settings-modal-title">Subject settings</h3>
+      <button class="icon-btn" onclick="closeModal('modal-subject-settings')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body" id="settings-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" onclick="confirmHideSubject()">Hide subject</button>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closeModal('modal-subject-settings')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSubjectSettings()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Level settings -->
+<div class="modal-overlay" id="modal-level-settings" style="display:none" onclick="closeModalOutside(event,'modal-level-settings')">
+  <div class="modal" style="width:420px">
+    <div class="modal-header">
+      <h3 id="level-settings-title">Level settings</h3>
+      <button class="icon-btn" onclick="closeModal('modal-level-settings')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Level name</label>
+          <input type="text" id="level-edit-title" placeholder="e.g. Higher">
+        </div>
+        <div class="form-group">
+          <label>Short label</label>
+          <input type="text" id="level-edit-short-title" placeholder="e.g. H">
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label>Description</label>
+        <textarea id="level-edit-description" rows="3" placeholder="Brief description shown on the subject page card" style="width:100%;resize:vertical"></textarea>
+      </div>
+      <div class="resource-toggle-row" style="margin-top:8px">
+        <div class="resource-toggle-info">
+          <strong>Published</strong>
+          <span>Show this level on the public site</span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="level-published-toggle">
+          <div class="toggle-slider"></div>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" onclick="confirmDeleteLevel()">Delete level</button>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closeModal('modal-level-settings')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveLevelSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add level -->
+<div class="modal-overlay" id="modal-add-level" style="display:none" onclick="closeModalOutside(event,'modal-add-level')">
+  <div class="modal" style="width:400px">
+    <div class="modal-header">
+      <h3>Add level</h3>
+      <button class="icon-btn" onclick="closeModal('modal-add-level')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Level name</label>
+          <input type="text" id="new-level-title" placeholder="e.g. National 5" oninput="autoLevelShort()">
+        </div>
+        <div class="form-group">
+          <label>Short label</label>
+          <input type="text" id="new-level-short" placeholder="e.g. N5">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add-level')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNewLevel()">Add level</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add / Edit Section -->
+<div class="modal-overlay" id="modal-add-section" style="display:none" onclick="closeModalOutside(event,'modal-add-section')">
+  <div class="modal" style="width:420px">
+    <div class="modal-header">
+      <h3 id="add-section-modal-title">Add section</h3>
+      <button class="icon-btn" onclick="closeModal('modal-add-section')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Section title</label>
+        <input type="text" id="new-section-title" placeholder="e.g. Past Papers">
+      </div>
+      <div class="form-group" id="section-type-group">
+        <label>Content type</label>
+        <select id="new-section-type" onchange="onSectionTypeChange()">
+          <option value="pastPapers">Past Papers</option>
+          <option value="archive">Archive Papers</option>
+          <option value="trafficLights">Traffic Light Summaries</option>
+          <option value="questionMaps">Question Maps</option>
+          <option value="studyNotes">Study Notes</option>
+          <option value="dataBooklets">Data Booklets</option>
+          <option value="formulaSheets">Formula Sheets</option>
+          <option value="customTable">Custom Table</option>
+        </select>
+      </div>
+      <div id="section-jabchem-row" class="resource-toggle-row">
+        <div class="resource-toggle-info">
+          <strong>JABchem marking schemes</strong>
+          <span>Show JABchem MS column for papers in this section</span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="new-section-jabchem" checked>
+          <div class="toggle-slider"></div>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add-section')">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-section" onclick="saveNewSection()">Add section</button>
+    </div>
+  </div>
+</div>
+
+<!-- Section Settings (rename + jabchem toggle + customTable config) -->
+<div class="modal-overlay" id="modal-rename-section" style="display:none" onclick="closeModalOutside(event,'modal-rename-section')">
+  <div class="modal" style="width:520px">
+    <div class="modal-header">
+      <h3>Section settings</h3>
+      <button class="icon-btn" onclick="closeModal('modal-rename-section')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Section title</label>
+        <input type="text" id="rename-section-title">
+      </div>
+      <div id="rename-jabchem-row" class="resource-toggle-row" style="display:none">
+        <div class="resource-toggle-info">
+          <strong>JABchem marking schemes</strong>
+          <span>Show JABchem MS column in this section's paper table</span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="rename-section-jabchem">
+          <div class="toggle-slider"></div>
+        </label>
+      </div>
+      <!-- Custom table extra fields (shown only for customTable sections) -->
+      <div id="rename-section-extra" style="display:none">
+        <div class="form-group" style="margin-top:12px">
+          <label>Description <span style="font-weight:400;color:var(--text-light)">(optional)</span></label>
+          <textarea id="rename-section-desc" rows="2" placeholder="Intro text shown above the table"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Footnote <span style="font-weight:400;color:var(--text-light)">(optional)</span></label>
+          <input type="text" id="rename-section-footnote" placeholder="Small note shown below the table">
+        </div>
+        <div class="form-group">
+          <label>Columns</label>
+          <div id="rename-section-columns"></div>
+          <button type="button" class="btn btn-sm" style="margin-top:8px" onclick="addColumnToEditor()">
+            <i class="fa fa-plus"></i> Add column
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-rename-section')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRenameSection()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add / Edit Table Row -->
+<div class="modal-overlay" id="modal-table-row" style="display:none" onclick="closeModalOutside(event,'modal-table-row')">
+  <div class="modal" style="width:560px">
+    <div class="modal-header">
+      <h3 id="modal-table-row-title">Add row</h3>
+      <button class="icon-btn" onclick="closeModal('modal-table-row')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body" id="modal-table-row-body"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-table-row')">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-table-row" onclick="saveTableRow()">Save row</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Paper -->
+<div class="modal-overlay" id="modal-edit-paper" style="display:none" onclick="closeModalOutside(event,'modal-edit-paper')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Edit paper — <span id="edit-paper-year-label"></span></h3>
+      <button class="icon-btn" onclick="closeModal('modal-edit-paper')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div id="edit-paper-fields"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-edit-paper')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditPaper()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Resource -->
+<div class="modal-overlay" id="modal-edit-resource" style="display:none" onclick="closeModalOutside(event,'modal-edit-resource')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="edit-resource-modal-title">Edit resource</h3>
+      <button class="icon-btn" onclick="closeModal('modal-edit-resource')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" id="edit-resource-title">
+      </div>
+      <div class="form-group">
+        <label>File (PDF)</label>
+        <div style="margin-bottom:6px" id="edit-resource-current-file"></div>
+        <input type="file" id="edit-resource-file" accept=".pdf">
+        <div class="url-or-divider"><span>or paste URL</span></div>
+        <input type="url" id="edit-resource-url" class="url-fetch-input" placeholder="https://…">
+        <div class="hint">Leave both blank to keep the current file</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-edit-resource')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditResource()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<div class="notification" id="notification"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let state = {
+  content: null,
+  activeSubjectId: null,
+  activeLevelId: null,
+  activeSectionId: null,
+  activeView: 'home',
+  pendingChanges: 0
+};
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+async function boot() {
+  const res = await fetch('/api/content');
+  state.content = await res.json();
+  renderSidebar();
+  showView('home');
+}
+
+// ── Sidebar ────────────────────────────────────────────────────────────────
+function renderSidebar() {
+  const c = state.content;
+  const order = c.site.nav.subjectOrder;
+  const subjects = order.map(id => c.subjects.find(s => s.id === id)).filter(Boolean);
+  const extra = c.subjects.filter(s => !order.includes(s.id));
+
+  const list = document.getElementById('subject-list');
+  list.innerHTML = [...subjects, ...extra].map(s => `
+    <div class="subject-item ${s.id === state.activeSubjectId ? 'active' : ''}"
+         onclick="selectSubject('${s.id}')">
+      <div class="subject-dot" style="background:${s.colour}"></div>
+      <span class="subject-name">${s.title}</span>
+      ${!s.published ? '<span class="subject-badge">hidden</span>' : ''}
+    </div>
+  `).join('');
+}
+
+// ── View routing ───────────────────────────────────────────────────────────
+function showView(view) {
+  state.activeView = view;
+  document.querySelectorAll('[id^=view-]').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+
+  if (view === 'home') {
+    setBreadcrumb('Dashboard');
+    setTopActions('');
+    renderHome();
+  } else if (view === 'settings') {
+    setBreadcrumb('Site settings');
+    setTopActions('');
+    renderSiteSettings();
+  }
+
+  document.querySelectorAll('.subject-item').forEach(el => el.classList.remove('active'));
+  if (view === 'subject') return;
+  state.activeSubjectId = null;
+}
+
+function setBreadcrumb(text) {
+  document.getElementById('breadcrumb').innerHTML = `<span class="current">${text}</span>`;
+}
+
+function setTopActions(html) {
+  document.getElementById('topbar-actions').innerHTML = html;
+}
+
+// ── Home ───────────────────────────────────────────────────────────────────
+function countResources(sections) {
+  return (sections||[]).reduce((a,s) => a + (s.papers||[]).length + (s.items||[]).length + (s.rows||[]).length, 0);
+}
+
+async function renderHome() {
+  const c = state.content;
+  document.getElementById('home-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Subjects</div><div class="stat-value">${c.subjects.filter(s=>s.published).length}</div></div>
+    <div class="stat-card"><div class="stat-label">Resources</div><div class="stat-value" id="stat-pdf-count">…</div></div>
+    <div class="stat-card"><div class="stat-label">Site</div><div class="stat-value" style="font-size:14px;padding-top:4px">${c.site.baseUrl}</div></div>
+  `;
+  try {
+    const res = await fetch('/api/stats');
+    const data = await res.json();
+    const el = document.getElementById('stat-pdf-count');
+    if (el) el.textContent = data.pdfCount.toLocaleString();
+  } catch (e) { /* leave as … if fetch fails */ }
+  document.getElementById('home-subject-cards').innerHTML = c.subjects.map(s => `
+    <div class="subject-card" onclick="selectSubject('${s.id}')">
+      <div class="sc-icon" style="background:${s.colour}20">
+        <i class="fa ${s.icon.fa}" style="color:${s.colour}"></i>
+      </div>
+      <h3>${s.title}</h3>
+      <p>${s.levels.length} levels · ${s.levels.reduce((a,l)=>a+countResources(l.sections),0)} resources</p>
+    </div>
+  `).join('');
+}
+
+// ── Subject view ───────────────────────────────────────────────────────────
+function selectSubject(id) {
+  state.activeSubjectId = id;
+  state.activeView = 'subject';
+  const subj = getSubject(id);
+  if (!subj) return;
+
+  // Default to first published level
+  state.activeLevelId = subj.levels.find(l => l.published)?.id || subj.levels[0]?.id;
+  state.activeSectionId = null;
+
+  document.querySelectorAll('[id^=view-]').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-subject').classList.add('active');
+
+  document.querySelectorAll('.subject-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.subject-item').forEach(el => {
+    if (el.querySelector('.subject-name')?.textContent === subj.title) el.classList.add('active');
+  });
+
+  renderSubjectView();
+}
+
+function renderSubjectView() {
+  const subj = getSubject(state.activeSubjectId);
+  if (!subj) return;
+
+  // Breadcrumb
+  document.getElementById('breadcrumb').innerHTML =
+    `<span style="cursor:pointer;color:var(--text-muted)" onclick="showView('home')">All subjects</span>
+     <i class="fa fa-chevron-right" style="font-size:10px;color:var(--text-light)"></i>
+     <span class="current">${subj.title}</span>`;
+
+  // Top actions
+  setTopActions(`
+    <button class="btn btn-sm" onclick="openSubjectSettings('${subj.id}')">
+      <i class="fa fa-cog"></i> Settings
+    </button>
+    <button class="btn btn-sm btn-primary" onclick="openAddPaperModal()">
+      <i class="fa fa-plus"></i> Add paper
+    </button>
+  `);
+
+  // Subject header
+  document.getElementById('subject-header').innerHTML = `
+    <div class="subject-icon-lg" style="background:${subj.colour}20">
+      <i class="fa ${subj.icon.fa}" style="color:${subj.colour};font-size:20px"></i>
+    </div>
+    <div>
+      <h2>${subj.title}</h2>
+      <p>${subj.description || ''}</p>
+    </div>
+    <div class="header-actions">
+      ${!subj.published ? '<span class="badge badge-amber"><i class="fa fa-eye-slash"></i> Hidden</span>' : ''}
+    </div>
+  `;
+
+  renderLevelTabs();
+  renderSectionTabs();
+  renderResourceContent();
+}
+
+function renderLevelTabs() {
+  const subj = getSubject(state.activeSubjectId);
+  if (!subj) return;
+  const levels = subj.levels;
+  document.getElementById('level-tabs').innerHTML = levels.map((lv, idx) => {
+    const isActive = lv.id === state.activeLevelId;
+    return `<div class="level-tab ${isActive ? 'active' : ''}" onclick="selectLevel('${lv.id}')">
+      ${lv.shortTitle}
+      ${isActive ? `
+        <button class="tab-icon-btn" onclick="event.stopPropagation();moveLevelTab(-1)" title="Move left" ${idx === 0 ? 'disabled style="opacity:0.4"' : ''}><i class="fa fa-chevron-left" style="font-size:8px"></i></button>
+        <button class="tab-icon-btn" onclick="event.stopPropagation();moveLevelTab(1)" title="Move right" ${idx === levels.length - 1 ? 'disabled style="opacity:0.4"' : ''}><i class="fa fa-chevron-right" style="font-size:8px"></i></button>
+        <button class="tab-icon-btn" style="margin-left:2px" onclick="event.stopPropagation();openLevelSettings()" title="Edit level"><i class="fa fa-pencil"></i></button>
+        <button class="tab-icon-btn del" onclick="event.stopPropagation();confirmDeleteLevel('${lv.id}')" title="Delete level"><i class="fa fa-times"></i></button>
+      ` : ''}
+    </div>`;
+  }).join('') + `
+    <button class="btn btn-sm" style="margin-left:4px" onclick="openAddLevel()">
+      <i class="fa fa-plus" style="font-size:10px"></i> Add level
+    </button>`;
+}
+
+function selectLevel(levelId) {
+  state.activeLevelId = levelId;
+  state.activeSectionId = null;
+  renderLevelTabs();
+  renderSectionTabs();
+  renderResourceContent();
+}
+
+async function moveLevelTab(direction) {
+  const subj = getSubject(state.activeSubjectId);
+  const levels = subj.levels;
+  const idx = levels.findIndex(l => l.id === state.activeLevelId);
+  const newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= levels.length) return;
+  const order = levels.map(l => l.id);
+  order.splice(idx, 1);
+  order.splice(newIdx, 0, state.activeLevelId);
+  await fetch(`/api/subjects/${subj.id}/levels/reorder`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ order })
+  });
+  state.content = await (await fetch('/api/content')).json();
+  renderLevelTabs();
+  markChanged();
+}
+
+const SECTION_TYPE_LABELS = {
+  pastPapers:    'Past Papers',
+  archive:       'Archive Papers',
+  trafficLights: 'Traffic Light Summaries',
+  questionMaps:  'Question Maps',
+  studyNotes:    'Study Notes',
+  dataBooklets:  'Data Booklets',
+  formulaSheets: 'Formula Sheets',
+  customTable:   'Custom Table',
+};
+
+function renderSectionTabs() {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  if (!level) return;
+  const sections = level.sections || [];
+
+  // Ensure active section is valid
+  if (!sections.find(s => s.id === state.activeSectionId)) {
+    state.activeSectionId = sections[0]?.id || null;
+  }
+
+  const tabsHtml = sections.map((s, idx) => {
+    const isActive = s.id === state.activeSectionId;
+    return `<div class="resource-tab ${isActive ? 'active' : ''}" onclick="selectSection('${s.id}')">
+      ${s.title}
+      ${isActive ? `
+        <button class="tab-icon-btn" onclick="event.stopPropagation();moveSectionTab(-1)" title="Move left" ${idx === 0 ? 'disabled style="opacity:0.4"' : ''}><i class="fa fa-chevron-left" style="font-size:8px"></i></button>
+        <button class="tab-icon-btn" onclick="event.stopPropagation();moveSectionTab(1)" title="Move right" ${idx === sections.length - 1 ? 'disabled style="opacity:0.4"' : ''}><i class="fa fa-chevron-right" style="font-size:8px"></i></button>
+        <button class="tab-icon-btn" onclick="event.stopPropagation();openSectionSettings('${s.id}')" title="Rename / settings"><i class="fa fa-pencil"></i></button>
+        <button class="tab-icon-btn del" onclick="event.stopPropagation();confirmDeleteSection('${s.id}')" title="Delete section"><i class="fa fa-times"></i></button>
+      ` : ''}
+    </div>`;
+  }).join('');
+
+  document.getElementById('section-tabs').innerHTML = tabsHtml + `
+    <button class="resource-tab-add" onclick="openAddSection()">
+      <i class="fa fa-plus" style="font-size:10px"></i> Add section
+    </button>`;
+}
+
+function selectSection(sectionId) {
+  state.activeSectionId = sectionId;
+  renderSectionTabs();
+  renderResourceContent();
+}
+
+async function moveSectionTab(direction) {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const sections = level.sections || [];
+  const idx = sections.findIndex(s => s.id === state.activeSectionId);
+  const newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= sections.length) return;
+  const order = sections.map(s => s.id);
+  order.splice(idx, 1);
+  order.splice(newIdx, 0, state.activeSectionId);
+  await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections/reorder`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ order })
+  });
+  state.content = await (await fetch('/api/content')).json();
+  renderSectionTabs();
+  markChanged();
+}
+
+function renderResourceContent() {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const el = document.getElementById('resource-content');
+
+  if (!level) { el.innerHTML = ''; return; }
+
+  const section = (level.sections || []).find(s => s.id === state.activeSectionId);
+
+  if (!section) {
+    el.innerHTML = `<div class="empty-state"><i class="fa fa-layer-group"></i><p>No sections yet — click "Add section" to create one</p></div>`;
+    return;
+  }
+
+  const rt = section.resourceType;
+  const isPaperType = rt === 'pastPapers' || rt === 'archive';
+
+  if (isPaperType) {
+    const papers = section.papers || [];
+    const isPaperMultiPart = !!subj.paperStructure;
+    const showJabchem = section.jabchemMarkingScheme !== false;
+
+    let headCols, rowFn;
+    if (isPaperMultiPart) {
+      const parts = subj.paperStructure.parts;
+      headCols = ['Year', ...parts.map(p => p.label)];
+      if (showJabchem) headCols.push('JABchem MS');
+      headCols.push('SQA MS', 'Status', '');
+      rowFn = p => {
+        const yearDisplay = p.label ? `${p.year} <span class="badge badge-gray" style="font-size:10px;vertical-align:middle">${escHtml(p.label)}</span>` : p.year;
+        return `
+        <td style="font-weight:500">${yearDisplay}</td>
+        ${parts.map(pt => `<td>${fileCell(p[pt.id])}</td>`).join('')}
+        ${showJabchem ? `<td>${fileCell(p.jabchemMarkingScheme)}</td>` : ''}
+        <td>${fileCell(p.markingScheme)}</td>
+        <td>${statusBadge(p)}</td>
+        <td>${rowActions(p)}</td>`;
+      };
+    } else {
+      headCols = ['Year', 'Paper PDF'];
+      if (showJabchem) headCols.push('JABchem MS');
+      headCols.push('SQA MS', 'Status', '');
+      rowFn = p => {
+        const yearDisplay = p.label ? `${p.year} <span class="badge badge-gray" style="font-size:10px;vertical-align:middle">${escHtml(p.label)}</span>` : p.year;
+        return `
+        <td style="font-weight:500">${yearDisplay}</td>
+        <td>${fileCell(p.paper)}</td>
+        ${showJabchem ? `<td>${fileCell(p.jabchemMarkingScheme)}</td>` : ''}
+        <td>${fileCell(p.markingScheme)}</td>
+        <td>${statusBadge(p)}</td>
+        <td>${rowActions(p)}</td>`;
+      };
+    }
+
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <h3>${section.title} — ${level.title}</h3>
+          <button class="btn btn-sm btn-primary" onclick="openAddPaperModal()">
+            <i class="fa fa-plus"></i> Add paper
+          </button>
+        </div>
+        <div class="card-body">
+          ${papers.length ? `
+            <table class="data-table">
+              <thead><tr>${headCols.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+              <tbody>${papers.map(p => `<tr>${rowFn(p)}</tr>`).join('')}</tbody>
+            </table>` : `
+            <div class="empty-state">
+              <i class="fa fa-file-pdf"></i>
+              <p>No papers yet — click "Add paper" to get started</p>
+            </div>`}
+        </div>
+      </div>
+      <div class="upload-zone" onclick="openAddPaperModal()"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="handleDrop(event)">
+        <i class="fa fa-cloud-upload-alt"></i>
+        <strong>Drop a paper here, or click to upload</strong>
+        <p class="path-preview">/files/${subj.slug}/${level.slug}/</p>
+      </div>`;
+
+  } else if (rt === 'customTable') {
+    const rows = section.rows || [];
+    const columns = section.columns || [];
+
+    let tableHtml;
+    if (!columns.length) {
+      tableHtml = `<div class="empty-state"><i class="fa fa-table-columns"></i><p>No columns defined — click the pencil icon on the section tab to configure columns</p></div>`;
+    } else if (!rows.length) {
+      tableHtml = `<div class="empty-state"><i class="fa fa-table"></i><p>No rows yet — click "Add row" to get started</p></div>`;
+    } else {
+      tableHtml = `
+        <table class="data-table">
+          <thead><tr>
+            <th style="width:50px">#</th>
+            ${columns.map(c => `<th>${escHtml(c.label)}</th>`).join('')}
+            <th style="width:110px"></th>
+          </tr></thead>
+          <tbody>
+            ${rows.map((row, i) => `<tr>
+              <td style="font-weight:500;color:var(--text-muted)">${escHtml(row.number || String(i + 1))}</td>
+              ${columns.map(col => {
+                const val = row[col.id];
+                if (col.type === 'text') return `<td>${escHtml(val || '')}</td>`;
+                if (col.type === 'file') return `<td>${val && val.file ? fileCell(val.file) : '<span class="missing">—</span>'}</td>`;
+                if (col.type === 'files') {
+                  const links = (val || []).filter(f => f.file).map(f => fileCell(f.file)).join('<br>');
+                  return `<td>${links || '<span class="missing">—</span>'}</td>`;
+                }
+                return '<td>—</td>';
+              }).join('')}
+              <td>
+                <div style="display:flex;gap:2px;align-items:center">
+                  <button class="icon-btn" onclick="moveTableRow('${row.id}',-1)" title="Move up" ${i === 0 ? 'disabled style="opacity:0.3"' : ''}><i class="fa fa-chevron-up" style="font-size:10px"></i></button>
+                  <button class="icon-btn" onclick="moveTableRow('${row.id}',1)" title="Move down" ${i === rows.length - 1 ? 'disabled style="opacity:0.3"' : ''}><i class="fa fa-chevron-down" style="font-size:10px"></i></button>
+                  <button class="icon-btn" onclick="openEditTableRow('${row.id}')" title="Edit"><i class="fa fa-pencil"></i></button>
+                  <button class="icon-btn danger" onclick="deleteTableRow('${row.id}')" title="Delete"><i class="fa fa-trash"></i></button>
+                </div>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <h3>${section.title} — ${level.title}</h3>
+          <button class="btn btn-sm btn-primary" onclick="openAddTableRow()">
+            <i class="fa fa-plus"></i> Add row
+          </button>
+        </div>
+        ${section.description ? `<div style="padding:10px 16px;font-size:13px;color:var(--text-muted);border-bottom:1px solid var(--border)">${escHtml(section.description)}</div>` : ''}
+        <div class="card-body">${tableHtml}</div>
+        ${section.footnote ? `<div style="padding:8px 16px;font-size:12px;color:var(--text-light);border-top:1px solid var(--border);font-style:italic">${escHtml(section.footnote)}</div>` : ''}
+      </div>`;
+
+  } else {
+    // Resource items section
+    const items = section.items || [];
+    const singularLabels = {
+      trafficLights: 'Traffic light summary',
+      questionMaps:  'Question map',
+      studyNotes:    'Study note',
+      dataBooklets:  'Data booklet',
+      formulaSheets: 'Formula sheet',
+    };
+    const label = singularLabels[rt] || rt;
+
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <h3>${section.title} — ${level.title}</h3>
+          <button class="btn btn-sm btn-primary" onclick="openAddItem()">
+            <i class="fa fa-plus"></i> Add ${label.toLowerCase()}
+          </button>
+        </div>
+        <div class="card-body">
+          ${items.length ? `
+            <table class="data-table">
+              <thead><tr><th>Title</th><th>File</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                ${items.map(it => `
+                  <tr>
+                    <td style="font-weight:500">${it.title}</td>
+                    <td>${fileCell(it.file)}</td>
+                    <td>${it.published ? '<span class="badge badge-green">Published</span>' : '<span class="badge badge-hidden">Hidden</span>'}</td>
+                    <td>
+                      <div style="display:flex;gap:4px">
+                        <button class="icon-btn" onclick="openEditItem('${it.id}')" title="Edit">
+                          <i class="fa fa-pencil"></i>
+                        </button>
+                        <button class="icon-btn danger" onclick="deleteItem('${it.id}')" title="Delete">
+                          <i class="fa fa-trash"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>` : `
+            <div class="empty-state">
+              <i class="fa fa-folder-open"></i>
+              <p>No ${label.toLowerCase()}s yet</p>
+            </div>`}
+        </div>
+      </div>`;
+  }
+
+  buildPaperFields();
+}
+
+// ── Paper fields (dynamic per subject) ────────────────────────────────────
+function buildPaperFields() {
+  const subj = getSubject(state.activeSubjectId);
+  if (!subj) return;
+  const container = document.getElementById('paper-fields');
+  if (!container) return;
+  const year = document.getElementById('paper-year')?.value || '2025';
+  const slug = subj.slug;
+  const lvSlug = getLevel(subj, state.activeLevelId)?.slug || '';
+
+  let html = '';
+  if (subj.paperStructure) {
+    subj.paperStructure.parts.forEach(part => {
+      html += fileUploadField(`file-${part.id}`, part.label, `/${slug}/${lvSlug}/${year}_${part.id}.pdf`);
+    });
+  } else {
+    html += fileUploadField('file-paper', 'Paper PDF', `/${slug}/${lvSlug}/${year}_paper.pdf`);
+  }
+  html += fileUploadField('file-jabchem-ms', 'JABchem marking scheme PDF', `/${slug}/${lvSlug}/${year}_jabchem_ms.pdf`, true);
+  html += fileUploadField('file-ms', 'SQA marking scheme PDF', `/${slug}/${lvSlug}/${year}_ms.pdf`, true);
+  container.innerHTML = html;
+}
+
+function fileUploadField(id, label, path, optional = false) {
+  return `
+    <div class="form-group">
+      <label>${label}${optional ? ' <span style="color:var(--text-light);font-weight:400">(optional)</span>' : ''}</label>
+      <input type="file" id="${id}" accept=".pdf" onchange="onFileChosen('${id}','${path}')">
+      <div class="url-or-divider"><span>or paste URL</span></div>
+      <input type="url" id="${id}-url" class="url-fetch-input" placeholder="https://…"
+             oninput="onUrlTyped('${id}','${path}')">
+      <div class="path-preview" id="preview-${id}">→ /files${path}</div>
+    </div>`;
+}
+
+function onFileChosen(id, path) {
+  const file = document.getElementById(id)?.files[0];
+  const urlEl = document.getElementById(id + '-url');
+  if (file) {
+    if (urlEl) urlEl.value = '';
+    document.getElementById('preview-' + id).textContent = `→ /files${path} ✓`;
+  }
+}
+
+function onUrlTyped(id, path) {
+  const url = document.getElementById(id + '-url')?.value.trim();
+  const fileEl = document.getElementById(id);
+  if (url) {
+    document.getElementById('preview-' + id).textContent = `→ /files${path} (will fetch from URL)`;
+  } else {
+    document.getElementById('preview-' + id).textContent = `→ /files${path}`;
+  }
+}
+
+// kept for backwards compat
+function updatePathPreview(id, basePath) { onFileChosen(id, basePath); }
+
+// ── Save paper ────────────────────────────────────────────────────────────
+async function savePaper() {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const year = parseInt(document.getElementById('paper-year').value);
+
+  const label = document.getElementById('paper-label')?.value.trim() || '';
+  if (!state.activeSectionId) { notify('No section selected', 'error'); return; }
+  const paperData = { year, section_id: state.activeSectionId, label };
+
+  // Upload or fetch files
+  const fieldMap = { ms: 'markingScheme', jabchem_ms: 'jabchemMarkingScheme', qmap: 'questionMap' };
+  const fileIds = subj.paperStructure
+    ? subj.paperStructure.parts.map(p => ({ id: `file-${p.id}`, type: p.id }))
+    : [{ id: 'file-paper', type: 'paper' }];
+  fileIds.push({ id: 'file-jabchem-ms', type: 'jabchem_ms' });
+  fileIds.push({ id: 'file-ms', type: 'ms' });
+
+  const btn = document.querySelector('#modal-add-paper .btn-primary');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Saving…'; }
+  try {
+    for (const { id, type } of fileIds) {
+      const path = await resolveFileField(id, id + '-url', {
+        subject_id: subj.slug, level_id: level.slug,
+        section_id: state.activeSectionId,
+        year: year.toString(), file_type: type
+      });
+      if (path) paperData[fieldMap[type] || type] = path;
+    }
+  } catch (e) {
+    notify(e.message, 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Save paper'; }
+    return;
+  }
+  if (btn) { btn.disabled = false; btn.innerHTML = 'Save paper'; }
+
+  const res = await fetch(`/api/subjects/${subj.id}/levels/${level.id}/papers`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(paperData)
+  });
+  const data = await res.json();
+  if (data.error) { notify(data.error, 'error'); return; }
+
+  state.content = await (await fetch('/api/content')).json();
+  const labelEl = document.getElementById('paper-label');
+  if (labelEl) labelEl.value = '';
+  closeModal('modal-add-paper');
+  renderResourceContent();
+  markChanged();
+  notify('Paper saved!', 'success');
+}
+
+// ── Section item actions ────────────────────────────────────────────────────
+function openAddItem() {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const section = (level?.sections || []).find(s => s.id === state.activeSectionId);
+  const labels = { trafficLights: 'Traffic light summary', studyNotes: 'Study note', dataBooklets: 'Data booklet', formulaSheets: 'Formula sheet', questionMaps: 'Question map' };
+  document.getElementById('add-resource-title').textContent = 'Add ' + (labels[section?.resourceType] || 'item');
+  document.getElementById('resource-path-preview').textContent = `→ /files/${subj.slug}/${level.slug}/${section?.resourceType || 'items'}/`;
+  document.getElementById('resource-title').value = '';
+  document.getElementById('resource-file').value = '';
+  document.getElementById('resource-url').value = '';
+  openModal('modal-add-resource');
+}
+
+async function saveResource() {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const section = (level?.sections || []).find(s => s.id === state.activeSectionId);
+  if (!section) { notify('No section selected', 'error'); return; }
+  const title = document.getElementById('resource-title').value.trim();
+  const fileInput = document.getElementById('resource-file');
+
+  if (!title) { notify('Please enter a title', 'error'); return; }
+
+  let filePath = null;
+  try {
+    filePath = await resolveFileField('resource-file', 'resource-url', {
+      subject_id: subj.slug, level_id: level.slug,
+      section_id: section.id,
+      file_type: section.resourceType,
+      custom_name: fileInput.files[0]?.name || ''
+    });
+  } catch (e) { notify(e.message, 'error'); return; }
+
+  const id = title.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now().toString(36);
+  await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections/${section.id}/items`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, title, file: filePath })
+  });
+
+  state.content = await (await fetch('/api/content')).json();
+  closeModal('modal-add-resource');
+  renderResourceContent();
+  markChanged();
+  notify('Saved!', 'success');
+}
+
+async function deleteItem(itemId) {
+  if (!confirm('Delete this item?')) return;
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections/${state.activeSectionId}/items/${itemId}`, { method: 'DELETE' });
+  state.content = await (await fetch('/api/content')).json();
+  renderResourceContent();
+  markChanged();
+  notify('Deleted');
+}
+
+async function deletePaper(year, label = '') {
+  const labelText = label ? ` (${label})` : '';
+  if (!confirm(`Delete the ${year}${labelText} paper entry?`)) return;
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const labelParam = `?label=${encodeURIComponent(label)}`;
+  await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections/${state.activeSectionId}/papers/${year}${labelParam}`, { method: 'DELETE' });
+  state.content = await (await fetch('/api/content')).json();
+  renderResourceContent();
+  markChanged();
+  notify('Deleted');
+}
+
+// ── Subject settings modal ─────────────────────────────────────────────────
+function openSubjectSettings(subjectId) {
+  const subj = getSubject(subjectId);
+  document.getElementById('settings-modal-title').textContent = subj.title + ' — settings';
+  document.getElementById('modal-subject-settings').dataset.subjectId = subjectId;
+
+  const colours = ['#534AB7','#1D9E75','#BA7517','#378ADD','#D4537E','#639922','#D85A30','#7F77DD','#E24B4A'];
+
+  document.getElementById('settings-modal-body').innerHTML = `
+    <div class="form-row">
+      <div class="form-group">
+        <label>Subject name</label>
+        <input type="text" id="edit-title" value="${subj.title}">
+      </div>
+      <div class="form-group">
+        <label>Short label</label>
+        <input type="text" id="edit-short-title" value="${subj.shortTitle || subj.title}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <textarea id="edit-desc" rows="2">${subj.description || ''}</textarea>
+    </div>
+    <div class="form-group">
+      <label>Font Awesome icon</label>
+      <input type="text" id="edit-icon" value="${subj.icon?.fa || 'fa-book'}">
+    </div>
+    <div class="form-group">
+      <label>Accent colour</label>
+      <div class="colour-row">
+        ${colours.map(c => `
+          <div class="colour-swatch ${subj.colour === c ? 'selected' : ''}"
+               style="background:${c}" data-colour="${c}"
+               onclick="selectEditColour(this)"></div>`).join('')}
+      </div>
+      <input type="text" id="edit-colour" value="${subj.colour}" style="margin-top:8px">
+    </div>
+    <div class="form-group">
+      <label>Published</label>
+      <label class="toggle" style="display:inline-flex;align-items:center;gap:10px">
+        <input type="checkbox" id="edit-published" ${subj.published ? 'checked' : ''}>
+        <div class="toggle-slider"></div>
+        <span style="font-size:13px;color:var(--text-muted)">Show on site</span>
+      </label>
+    </div>
+  `;
+  openModal('modal-subject-settings');
+}
+
+async function saveSubjectSettings() {
+  const subjectId = document.getElementById('modal-subject-settings').dataset.subjectId;
+  const updates = {
+    title: document.getElementById('edit-title').value,
+    shortTitle: document.getElementById('edit-short-title').value,
+    description: document.getElementById('edit-desc').value,
+    icon: { fa: document.getElementById('edit-icon').value, emoji: '' },
+    colour: document.getElementById('edit-colour').value,
+    published: document.getElementById('edit-published').checked,
+  };
+
+  await fetch(`/api/subjects/${subjectId}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates)
+  });
+
+  state.content = await (await fetch('/api/content')).json();
+  closeModal('modal-subject-settings');
+  renderSidebar();
+  if (state.activeSubjectId === subjectId) renderSubjectView();
+  markChanged();
+  notify('Subject updated!', 'success');
+}
+
+function selectEditColour(el) {
+  document.querySelectorAll('#settings-modal-body .colour-swatch').forEach(s => s.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('edit-colour').value = el.dataset.colour;
+}
+
+async function confirmHideSubject() {
+  const id = document.getElementById('modal-subject-settings').dataset.subjectId;
+  if (!confirm('Hide this subject from the site? You can re-enable it in settings at any time.')) return;
+  await fetch(`/api/subjects/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ published: false })
+  });
+  state.content = await (await fetch('/api/content')).json();
+  closeModal('modal-subject-settings');
+  renderSidebar();
+  if (state.activeSubjectId === id) renderSubjectView();
+  markChanged();
+  notify('Subject hidden from site');
+}
+
+// ── Add new subject ────────────────────────────────────────────────────────
+function autoSlug() {
+  const name = document.getElementById('new-subj-name').value;
+  const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  document.getElementById('new-subj-slug').value = slug;
+  document.getElementById('new-subj-url').textContent = 'jabchem.org.uk/' + (slug || '...');
+}
+
+function selectNewColour(el) {
+  document.querySelectorAll('#new-subj-colours .colour-swatch').forEach(s => s.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('new-subj-colour').value = el.dataset.colour;
+}
+
+async function saveNewSubject() {
+  const name = document.getElementById('new-subj-name').value.trim();
+  const slug = document.getElementById('new-subj-slug').value.trim();
+  if (!name || !slug) { notify('Name and slug are required', 'error'); return; }
+
+  const levelIds = [];
+  if (document.getElementById('lvl-n5').checked) levelIds.push('national5');
+  if (document.getElementById('lvl-h').checked)  levelIds.push('higher');
+  if (document.getElementById('lvl-ah').checked) levelIds.push('advancedhigher');
+
+  const newSubject = {
+    id: slug, slug, title: name, shortTitle: name,
+    description: document.getElementById('new-subj-desc').value,
+    homeHeroText: `${name} revision made easy`,
+    published: true,
+    icon: { fa: document.getElementById('new-subj-icon').value || 'fa-book', emoji: '' },
+    colour: document.getElementById('new-subj-colour').value || '#534AB7',
+    levelIds
+  };
+
+  const res = await fetch('/api/subjects', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newSubject)
+  });
+  const data = await res.json();
+  if (data.error) { notify(data.error, 'error'); return; }
+
+  state.content = await (await fetch('/api/content')).json();
+  closeModal('modal-add-subject');
+  renderSidebar();
+  markChanged();
+  notify(`${name} created!`, 'success');
+  selectSubject(slug);
+}
+
+// ── Site settings view ─────────────────────────────────────────────────────
+function renderSiteSettings() {
+  const s = state.content.site;
+  const links = (s.footer?.links || []);
+  const linksHtml = links.map((l, i) => `
+    <div class="footer-link-row" data-idx="${i}" style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+      <input type="text" placeholder="Label" value="${escHtml(l.label || '')}" style="flex:0 0 140px" oninput="footerLinkChanged()">
+      <input type="url" placeholder="URL" value="${escHtml(l.url || '')}" style="flex:1" oninput="footerLinkChanged()">
+      <button class="btn btn-sm" onclick="removeFooterLink(${i})" style="flex-shrink:0"><i class="fa fa-times"></i></button>
+    </div>`).join('');
+  const hero = s.hero || {};
+  const pb = hero.primaryBtn || {};
+  const sb = hero.secondaryBtn || {};
+  const fb = s.feedbackBanner || {};
+  document.getElementById('settings-content').innerHTML = `
+    <div class="settings-section">
+      <div class="settings-section-head"><h3>Home page hero</h3><p>The banner shown at the top of the home page</p></div>
+      <div class="settings-section-body">
+        <label class="checkbox-row" style="margin-bottom:14px">
+          <input type="checkbox" id="ss-hero-published" ${hero.published ? 'checked' : ''}>
+          Show announcement card on home page
+        </label>
+        <div class="form-group"><label>Heading</label><input type="text" id="ss-hero-heading" value="${escHtml(hero.heading || '')}" placeholder="Free SQA Revision for Scotland"></div>
+        <div class="form-group"><label>Body text</label><textarea id="ss-hero-text" rows="3" style="resize:vertical" placeholder="Describe the site…">${escHtml(hero.text || '')}</textarea></div>
+        <div class="form-row">
+          <div class="form-group"><label>Primary button label</label><input type="text" id="ss-hero-pb-label" value="${escHtml(pb.label || '')}" placeholder="Browse subjects"></div>
+          <div class="form-group"><label>Primary button URL</label><input type="text" id="ss-hero-pb-url" value="${escHtml(pb.url || '')}" placeholder="#subjects"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Secondary button label <span style="color:var(--text-light);font-weight:400">(optional)</span></label><input type="text" id="ss-hero-sb-label" value="${escHtml(sb.label || '')}" placeholder="Leave blank to hide"></div>
+          <div class="form-group"><label>Secondary button URL</label><input type="text" id="ss-hero-sb-url" value="${escHtml(sb.url || '')}" placeholder="https://…"></div>
+        </div>
+        <button class="btn btn-primary" onclick="saveSiteSettings()">Save</button>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-head"><h3>Feedback banner</h3><p>Mini banner shown below the subject grid on the home page</p></div>
+      <div class="settings-section-body">
+        <label class="checkbox-row" style="margin-bottom:14px">
+          <input type="checkbox" id="ss-fb-published" ${fb.published ? 'checked' : ''}>
+          Show feedback banner on home page
+        </label>
+        <div class="form-group"><label>Banner text</label><input type="text" id="ss-fb-text" value="${escHtml(fb.text || '')}" placeholder="How are we doing?…"></div>
+        <div class="form-row">
+          <div class="form-group"><label>Link label</label><input type="text" id="ss-fb-label" value="${escHtml(fb.linkLabel || '')}" placeholder="Share your thoughts"></div>
+          <div class="form-group"><label>Link URL</label><input type="text" id="ss-fb-url" value="${escHtml(fb.linkUrl || '')}" placeholder="mailto:… or https://…"></div>
+        </div>
+        <button class="btn btn-primary" onclick="saveSiteSettings()">Save</button>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-head"><h3>Site info</h3><p>Title, URL and meta</p></div>
+      <div class="settings-section-body">
+        <div class="form-row">
+          <div class="form-group"><label>Site title</label><input type="text" id="ss-title" value="${escHtml(s.title)}"></div>
+          <div class="form-group"><label>Tagline</label><input type="text" id="ss-tagline" value="${escHtml(s.tagline)}"></div>
+        </div>
+        <div class="form-group"><label>Base URL</label><input type="url" id="ss-url" value="${escHtml(s.baseUrl)}"></div>
+        <button class="btn btn-primary" onclick="saveSiteSettings()">Save site settings</button>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-head"><h3>Footer</h3><p>Copyright, callout block and legal text</p></div>
+      <div class="settings-section-body">
+        <div class="form-group"><label>Copyright line</label><input type="text" id="ss-footer-text" value="${escHtml(s.footer?.text || '')}"></div>
+        <div class="form-row">
+          <div class="form-group"><label>Callout title</label><input type="text" id="ss-callout-title" value="${escHtml(s.footer?.calloutTitle || '')}"></div>
+        </div>
+        <div class="form-group"><label>Callout text (HTML allowed)</label><textarea id="ss-callout-text" rows="3" style="resize:vertical">${escHtml(s.footer?.calloutText || '')}</textarea></div>
+        <div class="form-group"><label>Legal / disclaimer text</label><textarea id="ss-legal-text" rows="4" style="resize:vertical">${escHtml(s.footer?.legalText || '')}</textarea></div>
+        <div class="form-group">
+          <label>Bottom links</label>
+          <div id="footer-links-list">${linksHtml}</div>
+          <button class="btn btn-sm" onclick="addFooterLink()" style="margin-top:6px"><i class="fa fa-plus"></i> Add link</button>
+        </div>
+        <button class="btn btn-primary" onclick="saveSiteSettings()">Save site settings</button>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-head"><h3>Navigation order</h3><p>Drag to reorder subjects in the nav menu</p></div>
+      <div class="settings-section-body">
+        <div id="nav-order-list">
+          ${state.content.site.nav.subjectOrder.map(id => {
+            const subj = getSubject(id);
+            if (!subj) return '';
+            return `<div class="nav-order-item" data-id="${id}" draggable="true">
+              <i class="fa fa-grip-vertical" style="color:var(--text-light)"></i>
+              <div class="subject-dot" style="background:${subj.colour};width:8px;height:8px;border-radius:50%"></div>
+              <strong>${subj.title}</strong>
+            </div>`;
+          }).join('')}
+        </div>
+        <p class="hint" style="margin-top:8px">Drag to reorder — saved automatically</p>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-head"><h3>Privacy page</h3><p>Content shown at <strong>/privacy/</strong></p></div>
+      <div class="settings-section-body">
+        ${(() => {
+          const priv = s.privacy || {};
+          const sections = priv.sections || [];
+          const sectionsHtml = sections.map((sec, i) => `
+            <div style="margin-bottom:20px;padding:14px;border:1px solid var(--border);border-radius:8px;background:var(--bg)">
+              <div class="form-group" style="margin-bottom:10px">
+                <label>Section ${i + 1} heading</label>
+                <input type="text" class="priv-sec-heading" data-idx="${i}" value="${escHtml(sec.heading || '')}">
+              </div>
+              <div class="form-group" style="margin-bottom:0">
+                <label>Body <span style="color:var(--text-light);font-weight:400">(HTML)</span></label>
+                <textarea class="priv-sec-body" data-idx="${i}" rows="6" style="resize:vertical;font-family:monospace;font-size:12px">${escHtml(sec.body || '')}</textarea>
+              </div>
+            </div>`).join('');
+          return `
+            <div class="form-row">
+              <div class="form-group">
+                <label>Intro paragraph</label>
+                <textarea id="ss-priv-intro" rows="2" style="resize:vertical">${escHtml(priv.intro || '')}</textarea>
+              </div>
+              <div class="form-group">
+                <label>Last reviewed date</label>
+                <input type="text" id="ss-priv-reviewed" value="${escHtml(priv.lastReviewed || '')}" placeholder="e.g. 16/04/2026">
+              </div>
+            </div>
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:10px">Sections</label>
+            ${sectionsHtml}`;
+        })()}
+        <button class="btn btn-primary" onclick="saveSiteSettings()">Save</button>
+      </div>
+    </div>
+  `;
+  initNavDragDrop();
+}
+
+function initNavDragDrop() {
+  const list = document.getElementById('nav-order-list');
+  if (!list) return;
+  let dragged = null;
+
+  list.querySelectorAll('.nav-order-item').forEach(item => {
+    item.addEventListener('dragstart', () => {
+      dragged = item;
+      setTimeout(() => item.classList.add('dragging'), 0);
+    });
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      list.querySelectorAll('.nav-order-item').forEach(el => el.classList.remove('drag-over'));
+    });
+    item.addEventListener('dragover', e => {
+      e.preventDefault();
+      list.querySelectorAll('.nav-order-item').forEach(el => el.classList.remove('drag-over'));
+      if (item !== dragged) item.classList.add('drag-over');
+    });
+    item.addEventListener('drop', async e => {
+      e.preventDefault();
+      if (item === dragged) return;
+      const items = [...list.querySelectorAll('.nav-order-item')];
+      const fromIdx = items.indexOf(dragged);
+      const toIdx = items.indexOf(item);
+      if (fromIdx < toIdx) item.after(dragged);
+      else item.before(dragged);
+      item.classList.remove('drag-over');
+
+      const order = [...list.querySelectorAll('.nav-order-item')].map(el => el.dataset.id);
+      await fetch('/api/nav-order', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order })
+      });
+      state.content = await (await fetch('/api/content')).json();
+      markChanged();
+      notify('Navigation order saved!', 'success');
+    });
+  });
+}
+
+function getFooterLinks() {
+  const origLinks = state.content.site.footer?.links || [];
+  return [...document.querySelectorAll('#footer-links-list .footer-link-row')].map(row => {
+    const inputs = row.querySelectorAll('input');
+    const idx = parseInt(row.dataset.idx, 10);
+    const orig = origLinks[idx] || {};
+    const link = { label: inputs[0].value.trim(), url: inputs[1].value.trim() };
+    if (orig.reportProblem) link.reportProblem = true;
+    return link;
+  }).filter(l => l.label || l.url);
+}
+
+function addFooterLink() {
+  const list = document.getElementById('footer-links-list');
+  const idx = list.children.length;
+  const div = document.createElement('div');
+  div.className = 'footer-link-row';
+  div.dataset.idx = idx;
+  div.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:center';
+  div.innerHTML = `
+    <input type="text" placeholder="Label" value="" style="flex:0 0 140px" oninput="footerLinkChanged()">
+    <input type="url" placeholder="URL" value="" style="flex:1" oninput="footerLinkChanged()">
+    <button class="btn btn-sm" onclick="this.closest('.footer-link-row').remove()" style="flex-shrink:0"><i class="fa fa-times"></i></button>`;
+  list.appendChild(div);
+}
+
+function removeFooterLink(idx) {
+  const rows = document.querySelectorAll('#footer-links-list .footer-link-row');
+  if (rows[idx]) rows[idx].remove();
+}
+
+function footerLinkChanged() { /* triggers on input, no-op — collected on save */ }
+
+async function saveSiteSettings() {
+  const updates = {
+    title: document.getElementById('ss-title').value,
+    tagline: document.getElementById('ss-tagline').value,
+    baseUrl: document.getElementById('ss-url').value,
+    hero: {
+      published: document.getElementById('ss-hero-published').checked,
+      heading: document.getElementById('ss-hero-heading').value.trim(),
+      text: document.getElementById('ss-hero-text').value.trim(),
+      primaryBtn: {
+        label: document.getElementById('ss-hero-pb-label').value.trim(),
+        url: document.getElementById('ss-hero-pb-url').value.trim(),
+      },
+      secondaryBtn: {
+        label: document.getElementById('ss-hero-sb-label').value.trim(),
+        url: document.getElementById('ss-hero-sb-url').value.trim(),
+      },
+    },
+    feedbackBanner: {
+      published: document.getElementById('ss-fb-published').checked,
+      text: document.getElementById('ss-fb-text').value.trim(),
+      linkLabel: document.getElementById('ss-fb-label').value.trim(),
+      linkUrl: document.getElementById('ss-fb-url').value.trim(),
+    },
+    footer: {
+      text: document.getElementById('ss-footer-text')?.value || '',
+      calloutTitle: document.getElementById('ss-callout-title')?.value || '',
+      calloutText: document.getElementById('ss-callout-text')?.value || '',
+      legalText: document.getElementById('ss-legal-text')?.value || '',
+      links: getFooterLinks()
+    },
+    privacy: {
+      intro: document.getElementById('ss-priv-intro')?.value.trim() || '',
+      lastReviewed: document.getElementById('ss-priv-reviewed')?.value.trim() || '',
+      sections: Array.from(document.querySelectorAll('.priv-sec-heading')).map(el => ({
+        heading: el.value.trim(),
+        body: document.querySelector(`.priv-sec-body[data-idx="${el.dataset.idx}"]`)?.value.trim() || ''
+      }))
+    }
+  };
+  await fetch('/api/site', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates)
+  });
+  state.content = await (await fetch('/api/content')).json();
+  markChanged();
+  notify('Site settings saved!', 'success');
+}
+
+// ── Preview ────────────────────────────────────────────────────────────────
+function openPreviewModal() {
+  // Reset to idle state
+  setPreviewState('idle');
+  openModal('modal-preview');
+}
+
+function setPreviewState(state, data = {}) {
+  ['idle','building','done','error'].forEach(s => {
+    document.getElementById(`preview-modal-state-${s}`).style.display = s === state ? 'block' : 'none';
+  });
+  const btn = document.getElementById('btn-do-preview');
+  if (state === 'building') {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Building…';
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa fa-hammer"></i> Build &amp; preview';
+  }
+  if (state === 'done' && data.url) {
+    const link = document.getElementById('preview-open-link');
+    link.href = data.url;
+    link.textContent = data.url;
+    updatePreviewIndicator(true, data.url);
+  }
+  if (state === 'error' && data.message) {
+    document.getElementById('preview-error-log').textContent = data.message;
+  }
+  if (state === 'building' && data.log !== undefined) {
+    document.getElementById('preview-build-log').textContent = data.log;
+  }
+}
+
+async function doPreview() {
+  setPreviewState('building', { log: 'Starting build…' });
+  try {
+    const res = await fetch('/api/preview', { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      setPreviewState('done', { url: data.url });
+      // Auto-open the tab
+      window.open(data.url, '_blank');
+    } else {
+      setPreviewState('error', { message: data.message });
+    }
+  } catch (e) {
+    setPreviewState('error', { message: e.toString() });
+  }
+}
+
+function updatePreviewIndicator(running, url) {
+  const ind = document.getElementById('preview-indicator');
+  ind.style.display = running ? 'flex' : 'none';
+  if (running && url) {
+    document.getElementById('preview-link').href = url;
+  }
+}
+
+async function stopPreview() {
+  await fetch('/api/preview/stop', { method: 'POST' });
+  updatePreviewIndicator(false);
+  notify('Preview stopped');
+}
+
+// Check if a preview is already running on page load
+async function checkPreviewStatus() {
+  try {
+    const res = await fetch('/api/preview/status');
+    const data = await res.json();
+    if (data.running) updatePreviewIndicator(true, data.url);
+  } catch (e) { /* ignore */ }
+}
+
+// ── Publish ────────────────────────────────────────────────────────────────
+function openPublishModal() {
+  document.getElementById('publish-message').value = '';
+  openModal('modal-publish');
+}
+
+async function doPublish() {
+  const btn = document.getElementById('btn-do-publish');
+  btn.innerHTML = '<div class="spinner"></div> Building & pushing...';
+  btn.disabled = true;
+
+  const message = document.getElementById('publish-message').value || `Content update ${new Date().toLocaleDateString('en-GB')}`;
+
+  const res = await fetch('/api/publish', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message })
+  });
+  const data = await res.json();
+
+  btn.innerHTML = '<i class="fa fa-rocket"></i> Push to GitHub & publish';
+  btn.disabled = false;
+
+  if (data.status === 'ok') {
+    closeModal('modal-publish');
+    state.pendingChanges = 0;
+    updateDeployBar();
+    notify('Pushed to GitHub! Site is building (~30 seconds)', 'success');
+  } else {
+    notify('Error: ' + data.message, 'error');
+  }
+}
+
+// ── File upload helper ─────────────────────────────────────────────────────
+async function uploadFile(file, fields) {
+  const fd = new FormData();
+  fd.append('file', file);
+  Object.entries(fields).forEach(([k, v]) => fd.append(k, v));
+  const res = await fetch('/api/upload', { method: 'POST', body: fd });
+  const data = await res.json();
+  return data.path || null;
+}
+
+async function fetchFromUrl(url, fields) {
+  const res = await fetch('/api/fetch-url', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, ...fields })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data.path || null;
+}
+
+// Resolve a file field: upload file if chosen, else fetch URL if provided, else return null
+async function resolveFileField(fileInputId, urlInputId, uploadFields) {
+  const fileEl = document.getElementById(fileInputId);
+  const urlEl  = document.getElementById(urlInputId);
+  if (fileEl?.files[0]) return await uploadFile(fileEl.files[0], uploadFields);
+  const url = urlEl?.value.trim();
+  if (url) return await fetchFromUrl(url, uploadFields);
+  return null;
+}
+
+// ── Drag and drop ──────────────────────────────────────────────────────────
+function handleDrop(event) {
+  event.preventDefault();
+  event.target.classList.remove('drag-over');
+  const files = event.dataTransfer.files;
+  if (files.length) {
+    openAddPaperModal();
+    // Pre-fill file input — browsers don't allow setting files programmatically,
+    // but we at least open the modal for the user
+  }
+}
+
+// ── UI helpers ─────────────────────────────────────────────────────────────
+function fileCell(path) {
+  if (!path) return '<span class="missing">Not uploaded</span>';
+  const name = path.split('/').pop();
+  const ext = name.split('.').pop().toLowerCase();
+  const icon = ext === 'pdf' ? 'fa-file-pdf' : (ext === 'png' || ext === 'jpg' || ext === 'jpeg' ? 'fa-file-image' : 'fa-file');
+  return `<a href="${path}" class="file-link" target="_blank"><i class="fa ${icon}"></i> ${name}</a>`;
+}
+
+function statusBadge(paper) {
+  const fields = [paper.paper, paper.paper1, paper.markingScheme].filter(f => f !== undefined);
+  const filled = fields.filter(Boolean).length;
+  if (filled === 0) return '<span class="badge badge-gray">Empty</span>';
+  if (!paper.published) return '<span class="badge badge-hidden"><i class="fa fa-eye-slash"></i> Hidden</span>';
+  if (filled < fields.length) return '<span class="badge badge-amber">Incomplete</span>';
+  return '<span class="badge badge-green"><i class="fa fa-check"></i> Published</span>';
+}
+
+function rowActions(paper) {
+  const year = paper.year;
+  const label = paper.label || '';
+  // JSON.stringify produces double quotes which would break the HTML attribute — escape them
+  const labelJson = JSON.stringify(label).replace(/"/g, '&quot;');
+  const titleSuffix = label ? ` (${label})` : '';
+  return `<div style="display:flex;gap:4px">
+    <button class="icon-btn" onclick="openEditPaper(${year},${labelJson})" title="Edit ${year}${titleSuffix}">
+      <i class="fa fa-pencil"></i>
+    </button>
+    <button class="icon-btn danger" onclick="deletePaper(${year},${labelJson})" title="Delete ${year}${titleSuffix}">
+      <i class="fa fa-trash"></i>
+    </button>
+  </div>`;
+}
+
+function markChanged() {
+  state.pendingChanges++;
+  updateDeployBar();
+}
+
+function updateDeployBar() {
+  const el = document.getElementById('changes-count');
+  const txt = document.getElementById('deploy-status-text');
+  if (state.pendingChanges > 0) {
+    el.style.display = 'inline';
+    el.textContent = `${state.pendingChanges} unsaved change${state.pendingChanges > 1 ? 's' : ''}`;
+    txt.textContent = 'Changes not yet published';
+  } else {
+    el.style.display = 'none';
+    txt.textContent = 'Ready to publish';
+  }
+}
+
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function openAddPaperModal() {
+  const labelEl = document.getElementById('paper-label');
+  if (labelEl) labelEl.value = '';
+  openModal('modal-add-paper');
+}
+function closeModalOutside(e, id) { if (e.target.id === id) closeModal(id); }
+
+function notify(msg, type = '') {
+  const el = document.getElementById('notification');
+  el.textContent = (type === 'success' ? '✓ ' : type === 'error' ? '✕ ' : '') + msg;
+  el.className = 'notification show ' + type;
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+function getSubject(id) { return state.content?.subjects?.find(s => s.id === id); }
+function escHtml(str) { return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function getLevel(subj, id) { return subj?.levels?.find(l => l.id === id); }
+
+// ── Level settings ─────────────────────────────────────────────────────────
+function openLevelSettings() {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  if (!level) return;
+  document.getElementById('level-settings-title').textContent = `${level.title} — settings`;
+  document.getElementById('level-edit-title').value = level.title;
+  document.getElementById('level-edit-short-title').value = level.shortTitle || level.title;
+  document.getElementById('level-edit-description').value = level.description || '';
+  document.getElementById('level-published-toggle').checked = level.published !== false;
+  openModal('modal-level-settings');
+}
+
+async function saveLevelSettings() {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const updates = {
+    title: document.getElementById('level-edit-title').value.trim() || level.title,
+    shortTitle: document.getElementById('level-edit-short-title').value.trim() || level.shortTitle,
+    description: document.getElementById('level-edit-description').value.trim(),
+    published: document.getElementById('level-published-toggle').checked,
+  };
+  await fetch(`/api/subjects/${subj.id}/levels/${level.id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates)
+  });
+  state.content = await (await fetch('/api/content')).json();
+  closeModal('modal-level-settings');
+  renderSubjectView();
+  markChanged();
+  notify('Level settings saved!', 'success');
+}
+
+async function confirmDeleteLevel(levelId) {
+  const subj = getSubject(state.activeSubjectId);
+  const lid = levelId || state.activeLevelId;
+  const level = getLevel(subj, lid);
+  if (!level) return;
+  const paperCount = (level.sections || []).reduce((a, s) => a + (s.papers||[]).length + (s.items||[]).length + (s.rows||[]).length, 0);
+  const msg = paperCount > 0
+    ? `Delete "${level.title}" and its ${paperCount} resource${paperCount !== 1 ? 's' : ''}? This cannot be undone.`
+    : `Delete level "${level.title}"?`;
+  if (!confirm(msg)) return;
+  closeModal('modal-level-settings');
+  await fetch(`/api/subjects/${subj.id}/levels/${lid}`, { method: 'DELETE' });
+  state.content = await (await fetch('/api/content')).json();
+  const updatedSubj = getSubject(state.activeSubjectId);
+  state.activeLevelId = updatedSubj.levels.find(l => l.published)?.id || updatedSubj.levels[0]?.id || null;
+  state.activeSectionId = null;
+  renderSubjectView();
+  markChanged();
+  notify('Level deleted');
+}
+
+function openAddLevel() {
+  document.getElementById('new-level-title').value = '';
+  document.getElementById('new-level-short').value = '';
+  openModal('modal-add-level');
+}
+
+function autoLevelShort() {
+  const title = document.getElementById('new-level-title').value;
+  const words = title.trim().split(/\s+/);
+  const short = words.map(w => w[0]).join('').toUpperCase().slice(0, 4);
+  document.getElementById('new-level-short').value = short;
+}
+
+async function saveNewLevel() {
+  const title = document.getElementById('new-level-title').value.trim();
+  if (!title) { notify('Level name is required', 'error'); return; }
+  const shortTitle = document.getElementById('new-level-short').value.trim() || title.slice(0, 6);
+  const subj = getSubject(state.activeSubjectId);
+  const res = await fetch(`/api/subjects/${subj.id}/levels`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, shortTitle })
+  });
+  const data = await res.json();
+  if (data.error) { notify(data.error, 'error'); return; }
+  state.content = await (await fetch('/api/content')).json();
+  state.activeLevelId = data.level?.id || state.activeLevelId;
+  state.activeSectionId = null;
+  closeModal('modal-add-level');
+  renderSubjectView();
+  markChanged();
+  notify('Level added!', 'success');
+}
+
+// ── Sections ───────────────────────────────────────────────────────────────
+function onSectionTypeChange() {
+  const rt = document.getElementById('new-section-type').value;
+  const jabchemRow = document.getElementById('section-jabchem-row');
+  jabchemRow.style.display = (rt === 'pastPapers' || rt === 'archive') ? 'flex' : 'none';
+  // Show a note for customTable so users know to configure columns after creating
+  let hint = document.getElementById('section-customtable-hint');
+  if (!hint) {
+    hint = document.createElement('p');
+    hint.id = 'section-customtable-hint';
+    hint.style.cssText = 'font-size:12px;color:var(--text-muted);margin-top:6px';
+    hint.textContent = 'After creating, open section settings to configure columns.';
+    document.getElementById('section-jabchem-row').after(hint);
+  }
+  hint.style.display = rt === 'customTable' ? 'block' : 'none';
+}
+
+function openAddSection() {
+  document.getElementById('add-section-modal-title').textContent = 'Add section';
+  document.getElementById('new-section-title').value = '';
+  document.getElementById('new-section-type').value = 'pastPapers';
+  document.getElementById('new-section-jabchem').checked = true;
+  document.getElementById('section-jabchem-row').style.display = 'flex';
+  document.getElementById('section-type-group').style.display = '';
+  document.getElementById('btn-save-section').onclick = saveNewSection;
+  openModal('modal-add-section');
+}
+
+async function saveNewSection() {
+  const title = document.getElementById('new-section-title').value.trim();
+  if (!title) { notify('Please enter a title', 'error'); return; }
+  const resourceType = document.getElementById('new-section-type').value;
+  const jabchemMarkingScheme = document.getElementById('new-section-jabchem').checked;
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const res = await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, resourceType, jabchemMarkingScheme })
+  });
+  const data = await res.json();
+  state.content = await (await fetch('/api/content')).json();
+  state.activeSectionId = data.section?.id || null;
+  closeModal('modal-add-section');
+  document.getElementById('new-section-title').value = '';
+  renderSectionTabs();
+  renderResourceContent();
+  markChanged();
+  notify('Section added!', 'success');
+}
+
+function openSectionSettings(sectionId) {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const section = level?.sections?.find(s => s.id === sectionId);
+  if (!section) return;
+  document.getElementById('rename-section-title').value = section.title;
+  document.getElementById('modal-rename-section').dataset.sectionId = sectionId;
+
+  const jabchemRow = document.getElementById('rename-jabchem-row');
+  const extraDiv = document.getElementById('rename-section-extra');
+  const isPaperType = section.resourceType === 'pastPapers' || section.resourceType === 'archive';
+  const isCustomTable = section.resourceType === 'customTable';
+
+  jabchemRow.style.display = isPaperType ? 'flex' : 'none';
+  if (isPaperType) {
+    document.getElementById('rename-section-jabchem').checked = section.jabchemMarkingScheme !== false;
+  }
+
+  extraDiv.style.display = isCustomTable ? 'block' : 'none';
+  if (isCustomTable) {
+    document.getElementById('rename-section-desc').value = section.description || '';
+    document.getElementById('rename-section-footnote').value = section.footnote || '';
+    // Populate column editor
+    const colContainer = document.getElementById('rename-section-columns');
+    colContainer.innerHTML = (section.columns || []).map(col => columnEditorRow(col)).join('');
+  }
+
+  openModal('modal-rename-section');
+}
+
+function columnEditorRow(col = {}) {
+  const id = col.id || '';
+  const label = col.label || '';
+  const type = col.type || 'text';
+  return `<div class="col-editor-row">
+    <input type="hidden" class="col-id" value="${escHtml(id)}">
+    <input type="text" class="col-label" placeholder="Column label" value="${escHtml(label)}">
+    <select class="col-type">
+      <option value="text" ${type==='text'?'selected':''}>Text</option>
+      <option value="file" ${type==='file'?'selected':''}>Single file</option>
+      <option value="files" ${type==='files'?'selected':''}>Multiple files</option>
+    </select>
+    <button type="button" class="icon-btn danger" onclick="this.closest('.col-editor-row').remove()" title="Remove column"><i class="fa fa-times"></i></button>
+  </div>`;
+}
+
+function addColumnToEditor() {
+  document.getElementById('rename-section-columns').insertAdjacentHTML('beforeend', columnEditorRow());
+}
+
+async function saveRenameSection() {
+  const sectionId = document.getElementById('modal-rename-section').dataset.sectionId;
+  const title = document.getElementById('rename-section-title').value.trim();
+  if (!title) { notify('Please enter a title', 'error'); return; }
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const section = level?.sections?.find(s => s.id === sectionId);
+  const updates = { title };
+
+  const jabchemRow = document.getElementById('rename-jabchem-row');
+  if (jabchemRow.style.display !== 'none') {
+    updates.jabchemMarkingScheme = document.getElementById('rename-section-jabchem').checked;
+  }
+
+  if (section?.resourceType === 'customTable') {
+    updates.description = document.getElementById('rename-section-desc')?.value || '';
+    updates.footnote = document.getElementById('rename-section-footnote')?.value || '';
+    const colRows = document.querySelectorAll('#rename-section-columns .col-editor-row');
+    updates.columns = [...colRows].map(row => {
+      const existingId = row.querySelector('.col-id')?.value?.trim() || '';
+      const label = row.querySelector('.col-label')?.value?.trim() || '';
+      const type = row.querySelector('.col-type')?.value || 'text';
+      if (!label) return null;
+      const id = existingId || label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') || ('col_' + Date.now());
+      return { id, label, type };
+    }).filter(Boolean);
+  }
+
+  await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections/${sectionId}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates)
+  });
+  state.content = await (await fetch('/api/content')).json();
+  closeModal('modal-rename-section');
+  renderSectionTabs();
+  renderResourceContent();
+  markChanged();
+  notify('Section updated!', 'success');
+}
+
+async function confirmDeleteSection(sectionId) {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const section = level?.sections?.find(s => s.id === sectionId);
+  const paperCount = (section?.papers?.length || 0) + (section?.items?.length || 0) + (section?.rows?.length || 0);
+  const msg = paperCount > 0
+    ? `Delete "${section.title}" and its ${paperCount} resource${paperCount > 1 ? 's' : ''}?`
+    : `Delete "${section?.title}"?`;
+  if (!confirm(msg)) return;
+  await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections/${sectionId}`, { method: 'DELETE' });
+  state.content = await (await fetch('/api/content')).json();
+  state.activeSectionId = null;
+  renderResourceContent();
+  markChanged();
+  notify('Section deleted');
+}
+
+// ── Edit paper ─────────────────────────────────────────────────────────────
+function openEditPaper(year, label = '') {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const section = (level.sections || []).find(s => s.id === state.activeSectionId);
+  const paper = (section?.papers || []).find(p => p.year === year && (p.label || '') === label);
+  if (!paper) return;
+
+  const labelText = label ? ` (${label})` : '';
+  document.getElementById('edit-paper-year-label').textContent = year + labelText;
+  document.getElementById('modal-edit-paper').dataset.year = year;
+  document.getElementById('modal-edit-paper').dataset.label = label;
+
+  let html = `<div class="form-group">
+    <label>Subtitle <span style="font-weight:400;color:var(--text-light)">(optional)</span></label>
+    <input type="text" id="edit-paper-label" value="${escHtml(label)}" placeholder="e.g. Unused Paper, Specimen">
+  </div>`;
+  if (subj.paperStructure) {
+    subj.paperStructure.parts.forEach(part => {
+      html += editFileField(`edit-file-${part.id}`, part.label, paper[part.id]);
+    });
+  } else {
+    html += editFileField('edit-file-paper', 'Paper PDF', paper.paper);
+  }
+  html += editFileField('edit-file-jabchem-ms', 'JABchem marking scheme', paper.jabchemMarkingScheme);
+  html += editFileField('edit-file-ms', 'SQA marking scheme', paper.markingScheme);
+
+  document.getElementById('edit-paper-fields').innerHTML = html;
+  openModal('modal-edit-paper');
+}
+
+function editFileField(id, label, currentPath) {
+  const currentDisplay = currentPath
+    ? `<a href="${currentPath}" target="_blank" class="file-link"><i class="fa fa-file-pdf"></i> ${currentPath.split('/').pop()}</a>`
+    : '<span class="missing">Not uploaded</span>';
+  return `
+    <div class="form-group">
+      <label>${label}</label>
+      <div style="margin-bottom:6px">${currentDisplay}</div>
+      <input type="file" id="${id}" accept=".pdf">
+      <div class="url-or-divider"><span>or paste URL</span></div>
+      <input type="url" id="${id}-url" class="url-fetch-input" placeholder="https://…">
+      <div class="hint">Leave both blank to keep the current file</div>
+    </div>`;
+}
+
+async function saveEditPaper() {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const year = parseInt(document.getElementById('modal-edit-paper').dataset.year);
+
+  const updates = {};
+  const fileIds = subj.paperStructure
+    ? subj.paperStructure.parts.map(p => ({ id: `edit-file-${p.id}`, type: p.id, field: p.id }))
+    : [{ id: 'edit-file-paper', type: 'paper', field: 'paper' }];
+  fileIds.push({ id: 'edit-file-jabchem-ms', type: 'jabchem_ms', field: 'jabchemMarkingScheme' });
+  fileIds.push({ id: 'edit-file-ms', type: 'ms', field: 'markingScheme' });
+
+  try {
+    for (const { id, type, field } of fileIds) {
+      const path = await resolveFileField(id, id + '-url', {
+        subject_id: subj.slug, level_id: level.slug,
+        section_id: state.activeSectionId,
+        year: year.toString(), file_type: type
+      });
+      if (path) updates[field] = path;
+    }
+  } catch (e) {
+    notify(e.message, 'error');
+    return;
+  }
+
+  const originalLabel = document.getElementById('modal-edit-paper').dataset.label || '';
+  const newLabel = document.getElementById('edit-paper-label')?.value.trim() || '';
+  if (newLabel !== originalLabel) updates.label = newLabel || null;
+
+  if (Object.keys(updates).length === 0) {
+    closeModal('modal-edit-paper');
+    return;
+  }
+
+  const labelParam = `?label=${encodeURIComponent(originalLabel)}`;
+  await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections/${state.activeSectionId}/papers/${year}${labelParam}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates)
+  });
+  state.content = await (await fetch('/api/content')).json();
+  closeModal('modal-edit-paper');
+  renderResourceContent();
+  markChanged();
+  notify('Paper updated!', 'success');
+}
+
+// ── Edit item ──────────────────────────────────────────────────────────────
+function openEditItem(itemId) {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const section = (level?.sections || []).find(s => s.id === state.activeSectionId);
+  const item = (section?.items || []).find(it => it.id === itemId);
+  if (!item) return;
+
+  const labels = { trafficLights: 'Traffic light summary', studyNotes: 'Study note', dataBooklets: 'Data booklet', formulaSheets: 'Formula sheet', questionMaps: 'Question map' };
+  document.getElementById('edit-resource-modal-title').textContent = 'Edit ' + (labels[section?.resourceType] || 'item');
+  document.getElementById('modal-edit-resource').dataset.sectionId = section.id;
+  document.getElementById('modal-edit-resource').dataset.itemId = itemId;
+  document.getElementById('edit-resource-title').value = item.title;
+
+  const currentFileEl = document.getElementById('edit-resource-current-file');
+  currentFileEl.innerHTML = item.file
+    ? `<a href="${item.file}" target="_blank" class="file-link"><i class="fa fa-file-pdf"></i> ${item.file.split('/').pop()}</a>`
+    : '<span class="missing">No file uploaded</span>';
+  document.getElementById('edit-resource-file').value = '';
+  document.getElementById('edit-resource-url').value = '';
+  openModal('modal-edit-resource');
+}
+
+async function saveEditResource() {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const sectionId = document.getElementById('modal-edit-resource').dataset.sectionId;
+  const section = (level?.sections || []).find(s => s.id === sectionId);
+  const itemId = document.getElementById('modal-edit-resource').dataset.itemId;
+  const title = document.getElementById('edit-resource-title').value.trim();
+  if (!title) { notify('Please enter a title', 'error'); return; }
+
+  const updates = { title };
+  try {
+    const fileInput = document.getElementById('edit-resource-file');
+    const newFile = await resolveFileField('edit-resource-file', 'edit-resource-url', {
+      subject_id: subj.slug, level_id: level.slug,
+      section_id: sectionId,
+      file_type: section?.resourceType || 'items',
+      custom_name: fileInput.files[0]?.name || ''
+    });
+    if (newFile) updates.file = newFile;
+  } catch (e) { notify(e.message, 'error'); return; }
+
+  await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections/${sectionId}/items/${itemId}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates)
+  });
+  state.content = await (await fetch('/api/content')).json();
+  closeModal('modal-edit-resource');
+  renderResourceContent();
+  markChanged();
+  notify('Updated!', 'success');
+}
+
+// Rebuild paper fields when year changes
+document.addEventListener('change', e => {
+  if (e.target.id === 'paper-year') buildPaperFields();
+});
+
+// ── Custom table rows ──────────────────────────────────────────────────────
+let _editingRowId = null;
+
+function openAddTableRow() {
+  _editingRowId = null;
+  document.getElementById('modal-table-row-title').textContent = 'Add row';
+  _buildRowModalBody(null);
+  openModal('modal-table-row');
+}
+
+function openEditTableRow(rowId) {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const section = (level?.sections || []).find(s => s.id === state.activeSectionId);
+  const row = (section?.rows || []).find(r => r.id === rowId);
+  _editingRowId = rowId;
+  document.getElementById('modal-table-row-title').textContent = 'Edit row';
+  _buildRowModalBody(row, section);
+  openModal('modal-table-row');
+}
+
+function _buildRowModalBody(row, section) {
+  if (!section) {
+    const subj = getSubject(state.activeSubjectId);
+    const level = getLevel(subj, state.activeLevelId);
+    section = (level?.sections || []).find(s => s.id === state.activeSectionId);
+  }
+  const columns = section?.columns || [];
+  if (!columns.length) {
+    document.getElementById('modal-table-row-body').innerHTML =
+      '<p style="font-size:13px;color:var(--text-muted)">No columns defined. Open section settings to configure columns first.</p>';
+    return;
+  }
+  let html = `<div class="form-group">
+    <label># <span style="font-weight:400;color:var(--text-light)">(row number / identifier)</span></label>
+    <input type="text" id="row-number" placeholder="e.g. 1, 1.1, 1.1a" value="${escHtml(row?.number || '')}">
+  </div>`;
+  for (const col of columns) {
+    if (col.type === 'text') {
+      html += `<div class="form-group">
+        <label>${escHtml(col.label)}</label>
+        <input type="text" id="row-col-${col.id}" value="${escHtml(row?.[col.id] || '')}">
+      </div>`;
+    } else if (col.type === 'file') {
+      const val = row?.[col.id] || {};
+      html += `<div class="form-group">
+        <label>${escHtml(col.label)}</label>
+        <input type="hidden" id="row-col-${col.id}-existing" value="${escHtml(val.file || '')}">
+        <input type="text" id="row-col-${col.id}-label" placeholder="Link label" value="${escHtml(val.label || '')}">
+        ${val.file ? `<div style="margin:5px 0 4px"><a href="${val.file}" class="file-link" target="_blank"><i class="fa fa-file-pdf"></i> ${val.file.split('/').pop()}</a></div>` : ''}
+        <input type="file" id="row-col-${col.id}-file" accept=".pdf" style="margin-top:5px">
+        <div class="url-or-divider"><span>or paste URL</span></div>
+        <input type="url" id="row-col-${col.id}-url" class="url-fetch-input" placeholder="https://…">
+        ${val.file ? '<div class="hint">Leave blank to keep current file</div>' : ''}
+      </div>`;
+    } else if (col.type === 'files') {
+      const files = row?.[col.id] || [];
+      html += `<div class="form-group">
+        <label>${escHtml(col.label)}</label>
+        <div id="row-col-${col.id}-list">
+          ${files.map((f, i) => _rowFileEntryHtml(col.id, i, f)).join('')}
+        </div>
+        <button type="button" class="btn btn-sm" style="margin-top:6px" onclick="_addRowFileEntry('${col.id}')">
+          <i class="fa fa-plus"></i> Add file
+        </button>
+      </div>`;
+    }
+  }
+  document.getElementById('modal-table-row-body').innerHTML = html;
+}
+
+function _rowFileEntryHtml(colId, idx, val = {}) {
+  return `<div class="row-file-entry">
+    <div class="entry-head">
+      <span class="entry-label">File ${idx + 1}</span>
+      <button type="button" class="icon-btn danger" onclick="this.closest('.row-file-entry').remove()" title="Remove"><i class="fa fa-times"></i></button>
+    </div>
+    <input type="hidden" class="existing-file" value="${escHtml(val.file || '')}">
+    <input type="text" class="row-file-label" placeholder="Link label" value="${escHtml(val.label || '')}">
+    ${val.file ? `<div style="margin-bottom:5px"><a href="${val.file}" class="file-link" target="_blank"><i class="fa fa-file-pdf"></i> ${val.file.split('/').pop()}</a></div>` : ''}
+    <input type="file" class="row-file-input" accept=".pdf" style="margin-bottom:5px">
+    <input type="url" class="row-file-url url-fetch-input" placeholder="https://… or leave blank to keep current">
+  </div>`;
+}
+
+function _addRowFileEntry(colId) {
+  const list = document.getElementById(`row-col-${colId}-list`);
+  const idx = list.querySelectorAll('.row-file-entry').length;
+  list.insertAdjacentHTML('beforeend', _rowFileEntryHtml(colId, idx));
+}
+
+async function saveTableRow() {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const section = (level?.sections || []).find(s => s.id === state.activeSectionId);
+  if (!section) return;
+
+  const btn = document.getElementById('btn-save-table-row');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Saving…';
+
+  try {
+    const rowData = { published: true, number: document.getElementById('row-number')?.value?.trim() || '' };
+    const uploadBase = { subject_id: subj.slug, level_id: level.slug, section_id: section.id, file_type: 'table_file' };
+
+    for (const col of (section.columns || [])) {
+      if (col.type === 'text') {
+        rowData[col.id] = document.getElementById(`row-col-${col.id}`)?.value || '';
+      } else if (col.type === 'file') {
+        const label = document.getElementById(`row-col-${col.id}-label`)?.value || '';
+        const existingFile = document.getElementById(`row-col-${col.id}-existing`)?.value || null;
+        const fileEl = document.getElementById(`row-col-${col.id}-file`);
+        const path = await resolveFileField(`row-col-${col.id}-file`, `row-col-${col.id}-url`, {
+          ...uploadBase, custom_name: fileEl?.files[0]?.name || ''
+        });
+        rowData[col.id] = { label, file: path || existingFile || null };
+      } else if (col.type === 'files') {
+        const list = document.getElementById(`row-col-${col.id}-list`);
+        const entries = list?.querySelectorAll('.row-file-entry') || [];
+        const files = [];
+        for (const entry of entries) {
+          const label = entry.querySelector('.row-file-label')?.value || '';
+          const existingFile = entry.querySelector('.existing-file')?.value || null;
+          const fileInput = entry.querySelector('.row-file-input');
+          const urlInput = entry.querySelector('.row-file-url');
+          let path = null;
+          if (fileInput?.files[0]) {
+            path = await uploadFile(fileInput.files[0], { ...uploadBase, custom_name: fileInput.files[0].name });
+          } else if (urlInput?.value.trim()) {
+            path = await fetchFromUrl(urlInput.value.trim(), uploadBase).catch(() => null);
+          }
+          if (label || path || existingFile) {
+            files.push({ label, file: path || existingFile || null });
+          }
+        }
+        rowData[col.id] = files;
+      }
+    }
+
+    const url = _editingRowId
+      ? `/api/subjects/${subj.id}/levels/${level.id}/sections/${section.id}/rows/${_editingRowId}`
+      : `/api/subjects/${subj.id}/levels/${level.id}/sections/${section.id}/rows`;
+    const method = _editingRowId ? 'PUT' : 'POST';
+
+    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rowData) });
+    state.content = await (await fetch('/api/content')).json();
+    closeModal('modal-table-row');
+    renderResourceContent();
+    markChanged();
+    notify(_editingRowId ? 'Row updated!' : 'Row added!', 'success');
+  } catch (e) {
+    notify('Error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.innerHTML = 'Save row';
+  }
+}
+
+async function deleteTableRow(rowId) {
+  if (!confirm('Delete this row?')) return;
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections/${state.activeSectionId}/rows/${rowId}`, { method: 'DELETE' });
+  state.content = await (await fetch('/api/content')).json();
+  renderResourceContent();
+  markChanged();
+  notify('Row deleted');
+}
+
+async function moveTableRow(rowId, direction) {
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const section = (level?.sections || []).find(s => s.id === state.activeSectionId);
+  if (!section) return;
+  const rows = section.rows || [];
+  const idx = rows.findIndex(r => r.id === rowId);
+  const newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= rows.length) return;
+  const order = rows.map(r => r.id);
+  order.splice(idx, 1);
+  order.splice(newIdx, 0, rowId);
+  await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections/${section.id}/rows/reorder`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ order })
+  });
+  state.content = await (await fetch('/api/content')).json();
+  renderResourceContent();
+  markChanged();
+}
+
+boot();
+checkPreviewStatus();
+</script>
+</body>
+</html>

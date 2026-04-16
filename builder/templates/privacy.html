@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Privacy Policy{% endblock %}
+{% block description %}How JABchem handles your data and protects your privacy.{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="/">{{ site.title }}</a>
+  <span class="sep">›</span>
+  <span>Privacy Policy</span>
+</div>
+
+<div class="privacy-wrap">
+  <div class="privacy-header">
+    <h1>Privacy Policy</h1>
+    <p class="privacy-intro">{{ site.privacy.intro }}</p>
+    {% if site.privacy.lastReviewed %}
+    <span class="privacy-reviewed"><i class="fa fa-circle-check"></i> Last reviewed {{ site.privacy.lastReviewed }}</span>
+    {% endif %}
+  </div>
+
+  {% for section in site.privacy.sections %}
+  <div class="privacy-section">
+    <h2>{{ section.heading }}</h2>
+    <div class="privacy-body">{{ section.body | safe }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+  .privacy-wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding-bottom: 48px;
+  }
+
+  .privacy-header {
+    margin-bottom: 40px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .privacy-header h1 {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+
+  .privacy-intro {
+    font-size: 15px;
+    color: var(--text-muted);
+    line-height: 1.65;
+    margin-bottom: 14px;
+  }
+
+  .privacy-reviewed {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--success, #1D9E75);
+    background: var(--success-pale, #e1f5ee);
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+
+  [data-theme="dark"] .privacy-reviewed {
+    background: rgba(29, 158, 117, 0.15);
+  }
+
+  .privacy-section {
+    margin-bottom: 36px;
+  }
+
+  .privacy-section h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .privacy-body p {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .privacy-body p:last-child {
+    margin-bottom: 0;
+  }
+
+  .privacy-body ul {
+    margin: 10px 0 14px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .privacy-body li {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-muted);
+  }
+
+  .privacy-body a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .privacy-body a:hover {
+    text-decoration: underline;
+  }
+
+  .privacy-body strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+</style>
+{% endblock %}

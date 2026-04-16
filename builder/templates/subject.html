@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}{{ subject.title }}{% endblock %}
+{% block description %}{{ subject.description }}{% endblock %}
+{% block extra_styles %}
+<style>
+  :root {
+    --accent: {{ subject.colour }};
+    --accent-pale: {{ subject.colour }}18;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="/">{{ site.title }}</a>
+  <span class="sep">›</span>
+  <span>{{ subject.title }}</span>
+</div>
+
+<div class="subject-hero" style="background: linear-gradient(135deg, {{ subject.colour }}, {{ subject.colour }}cc)">
+  <div class="subject-hero-icon">
+    <i class="fa {{ subject.icon.fa }}"></i>
+  </div>
+  <h1>{{ subject.homeHeroText or subject.title }}</h1>
+  <p>{{ subject.description }}</p>
+  <div class="subject-hero-stats">
+    <span><i class="fa fa-layer-group"></i> {{ subject.levels | selectattr('published') | list | length }} levels</span>
+    <span><i class="fa fa-layer-group"></i> {{ subject_pdfs[subject.slug] }} resources</span>
+  </div>
+</div>
+
+<div class="section-heading"><h2>Choose your level</h2></div>
+<div class="level-grid">
+  {% for level in subject.levels if level.published %}
+  <a href="/{{ subject.slug }}/{{ level.slug }}/" class="level-card">
+    <div class="level-card-icon">
+      <i class="fa fa-graduation-cap"></i>
+    </div>
+    <h3>{{ level.title }}</h3>
+    <p>{{ level.description }}</p>
+    <div class="level-card-stats">
+      {% set lv_pdf_count = level_pdfs[subject.slug + '/' + level.slug] %}
+      {% if lv_pdf_count > 0 %}
+      <span class="level-card-badge"><i class="fa fa-layer-group" style="font-size:10px; margin-right:3px"></i>{{ lv_pdf_count }} resources</span>
+      {% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

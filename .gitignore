@@ -1,0 +1,17 @@
+# Environment
+.env
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# The built site is committed (Cloudflare deploys from it)
+# but we exclude it from local tracking if preferred
+# Uncomment the next line to NOT commit the built site:
+# site/
+
+# Python
+*.egg-info/
+dist/
+build/
