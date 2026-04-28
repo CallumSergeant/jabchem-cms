@@ -874,7 +874,7 @@ def publish():
 
         # 6. Commit and push
         live_repo.git.add(A=True)
-        if live_repo.is_dirty(index=True) or live_repo.untracked_files:
+        if live_repo.git.status('--porcelain').strip():
             live_repo.index.commit(message)
             live_repo.remotes.origin.push(f'HEAD:{live_branch}')
             return jsonify({'status': 'ok', 'message': 'Published to GitHub Pages successfully'})
