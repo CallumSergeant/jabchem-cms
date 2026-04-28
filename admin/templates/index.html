@@ -398,6 +398,21 @@
         <label>Title</label>
         <input type="text" id="resource-title" placeholder="e.g. Unit 1 — Chemical Changes">
       </div>
+      <div class="form-group" id="add-resource-rel-group" style="display:none">
+        <label>Relationship Booklet (PDF)</label>
+        <input type="file" id="resource-rel-file" accept=".pdf">
+        <div class="url-or-divider"><span>or paste URL</span></div>
+        <input type="url" id="resource-rel-url" class="url-fetch-input" placeholder="https://…">
+      </div>
+      <div class="form-group" id="add-resource-level-group" style="display:none">
+        <label>Level</label>
+        <select id="resource-level">
+          <option value="">— None —</option>
+          <option value="N5">N5</option>
+          <option value="H">H</option>
+          <option value="AH">AH</option>
+        </select>
+      </div>
       <div class="form-group">
         <label>File (PDF)</label>
         <input type="file" id="resource-file" accept=".pdf">
@@ -687,6 +702,16 @@
         <label>Section title</label>
         <input type="text" id="rename-section-title">
       </div>
+      <div id="rename-databooklet-row" class="resource-toggle-row" style="display:none">
+        <div class="resource-toggle-info">
+          <strong>Relationship booklet column</strong>
+          <span>Show a separate column for relationship booklets alongside each item</span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="rename-section-relationship">
+          <div class="toggle-slider"></div>
+        </label>
+      </div>
       <div id="rename-jabchem-row" class="resource-toggle-row" style="display:none">
         <div class="resource-toggle-info">
           <strong>JABchem marking schemes</strong>
@@ -766,6 +791,23 @@
       <div class="form-group">
         <label>Title</label>
         <input type="text" id="edit-resource-title">
+      </div>
+      <div class="form-group" id="edit-resource-rel-group" style="display:none">
+        <label>Relationship Booklet (PDF)</label>
+        <div style="margin-bottom:6px" id="edit-resource-rel-current"></div>
+        <input type="file" id="edit-resource-rel-file" accept=".pdf">
+        <div class="url-or-divider"><span>or paste URL</span></div>
+        <input type="url" id="edit-resource-rel-url" class="url-fetch-input" placeholder="https://…">
+        <div class="hint">Leave both blank to keep the current file</div>
+      </div>
+      <div class="form-group" id="edit-resource-level-group" style="display:none">
+        <label>Level</label>
+        <select id="edit-resource-level">
+          <option value="">— None —</option>
+          <option value="N5">N5</option>
+          <option value="H">H</option>
+          <option value="AH">AH</option>
+        </select>
       </div>
       <div class="form-group">
         <label>File (PDF)</label>
@@ -1346,7 +1388,8 @@ function renderResourceContent() {
                 if (col.type === 'text') return `<td>${escHtml(val || '')}</td>`;
                 if (col.type === 'file') return `<td>${val && val.file ? fileCell(val.file) : '<span class="missing">—</span>'}</td>`;
                 if (col.type === 'files') {
-                  const links = (val || []).filter(f => f.file).map(f => fileCell(f.file)).join('<br>');
+                  const arr = Array.isArray(val) ? val : (val && val.file ? [val] : []);
+                  const links = arr.filter(f => f.file).map(f => fileCell(f.file)).join('<br>');
                   return `<td>${links || '<span class="missing">—</span>'}</td>`;
                 }
                 return '<td>—</td>';
@@ -1400,12 +1443,13 @@ function renderResourceContent() {
         <div class="card-body">
           ${items.length ? `
             <table class="data-table">
-              <thead><tr><th>Title</th><th>File</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th>Title</th><th>File</th>${section.relationshipBooklet ? '<th>Rel. Booklet</th>' : ''}<th>Status</th><th></th></tr></thead>
               <tbody>
                 ${items.map(it => `
                   <tr>
                     <td style="font-weight:500">${it.title}</td>
                     <td>${fileCell(it.file)}</td>
+                    ${section.relationshipBooklet ? `<td>${it.relationshipBooklet ? fileCell(it.relationshipBooklet) : '<span class="missing">—</span>'}</td>` : ''}
                     <td>${it.published ? '<span class="badge badge-green">Published</span>' : '<span class="badge badge-hidden">Hidden</span>'}</td>
                     <td>
                       <div style="display:flex;gap:4px">
@@ -1609,6 +1653,12 @@ function openAddItem() {
   document.getElementById('resource-title').value = '';
   document.getElementById('resource-file').value = '';
   document.getElementById('resource-url').value = '';
+  const isDataBooklet = section?.resourceType === 'dataBooklets';
+  document.getElementById('add-resource-level-group').style.display = isDataBooklet ? '' : 'none';
+  document.getElementById('resource-level').value = '';
+  document.getElementById('add-resource-rel-group').style.display = (isDataBooklet && section?.relationshipBooklet) ? '' : 'none';
+  document.getElementById('resource-rel-file').value = '';
+  document.getElementById('resource-rel-url').value = '';
   openModal('modal-add-resource');
 }
 
@@ -1632,10 +1682,21 @@ async function saveResource() {
     });
   } catch (e) { notify(e.message, 'error'); return; }
 
+  let relPath = null;
+  if (document.getElementById('add-resource-rel-group').style.display !== 'none') {
+    try {
+      const relInput = document.getElementById('resource-rel-file');
+      relPath = await resolveFileField('resource-rel-file', 'resource-rel-url', {
+        subject_id: subj.slug, level_id: level.slug, section_id: section.id,
+        file_type: 'relationship_booklet', custom_name: relInput.files[0]?.name || ''
+      });
+    } catch (e) { notify(e.message, 'error'); return; }
+  }
   const id = title.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now().toString(36);
+  const itemLevel = document.getElementById('resource-level').value || undefined;
   await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections/${section.id}/items`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id, title, file: filePath })
+    body: JSON.stringify({ id, title, file: filePath, ...(itemLevel ? { level: itemLevel } : {}), ...(relPath ? { relationshipBooklet: relPath } : {}) })
   });
 
   state.content = await (await fetch('/api/content')).json();
@@ -2445,9 +2506,16 @@ function openSectionSettings(sectionId) {
   document.getElementById('modal-rename-section').dataset.sectionId = sectionId;
 
   const jabchemRow = document.getElementById('rename-jabchem-row');
+  const databookletRow = document.getElementById('rename-databooklet-row');
   const extraDiv = document.getElementById('rename-section-extra');
   const isPaperType = section.resourceType === 'pastPapers' || section.resourceType === 'archive';
   const isCustomTable = section.resourceType === 'customTable';
+  const isDataBooklets = section.resourceType === 'dataBooklets';
+
+  databookletRow.style.display = isDataBooklets ? 'flex' : 'none';
+  if (isDataBooklets) {
+    document.getElementById('rename-section-relationship').checked = !!section.relationshipBooklet;
+  }
 
   jabchemRow.style.display = isPaperType ? 'flex' : 'none';
   if (isPaperType) {
@@ -2500,6 +2568,11 @@ async function saveRenameSection() {
     updates.jabchemMarkingScheme = document.getElementById('rename-section-jabchem').checked;
   }
 
+  const databookletRow = document.getElementById('rename-databooklet-row');
+  if (databookletRow.style.display !== 'none') {
+    updates.relationshipBooklet = document.getElementById('rename-section-relationship').checked;
+  }
+
   if (section?.resourceType === 'customTable') {
     updates.description = document.getElementById('rename-section-desc')?.value || '';
     updates.footnote = document.getElementById('rename-section-footnote')?.value || '';
@@ -2512,6 +2585,22 @@ async function saveRenameSection() {
       const id = existingId || label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') || ('col_' + Date.now());
       return { id, label, type };
     }).filter(Boolean);
+
+    // Migrate rows when a column changes from 'file' to 'files'
+    const oldColumns = section?.columns || [];
+    const fileToFiles = updates.columns
+      .filter(nc => { const oc = oldColumns.find(c => c.id === nc.id); return oc && oc.type === 'file' && nc.type === 'files'; })
+      .map(c => c.id);
+    if (fileToFiles.length > 0 && section?.rows?.length) {
+      updates.rows = section.rows.map(row => {
+        const r = { ...row };
+        for (const colId of fileToFiles) {
+          const val = r[colId];
+          r[colId] = Array.isArray(val) ? val : (val && val.file ? [val] : []);
+        }
+        return r;
+      });
+    }
   }
 
   await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections/${sectionId}`, {
@@ -2656,6 +2745,19 @@ function openEditItem(itemId) {
     : '<span class="missing">No file uploaded</span>';
   document.getElementById('edit-resource-file').value = '';
   document.getElementById('edit-resource-url').value = '';
+  const isDataBookletEdit = section?.resourceType === 'dataBooklets';
+  document.getElementById('edit-resource-level-group').style.display = isDataBookletEdit ? '' : 'none';
+  document.getElementById('edit-resource-level').value = item.level || '';
+  const showRelEdit = isDataBookletEdit && !!section?.relationshipBooklet;
+  document.getElementById('edit-resource-rel-group').style.display = showRelEdit ? '' : 'none';
+  if (showRelEdit) {
+    const relCurrentEl = document.getElementById('edit-resource-rel-current');
+    relCurrentEl.innerHTML = item.relationshipBooklet
+      ? `<a href="${item.relationshipBooklet}" target="_blank" class="file-link"><i class="fa fa-file-pdf"></i> ${item.relationshipBooklet.split('/').pop()}</a>`
+      : '<span class="missing">No file uploaded</span>';
+    document.getElementById('edit-resource-rel-file').value = '';
+    document.getElementById('edit-resource-rel-url').value = '';
+  }
   openModal('modal-edit-resource');
 }
 
@@ -2668,7 +2770,10 @@ async function saveEditResource() {
   const title = document.getElementById('edit-resource-title').value.trim();
   if (!title) { notify('Please enter a title', 'error'); return; }
 
-  const updates = { title };
+  const editLevel = document.getElementById('edit-resource-level-group').style.display !== 'none'
+    ? document.getElementById('edit-resource-level').value || null
+    : undefined;
+  const updates = { title, ...(editLevel !== undefined ? { level: editLevel || null } : {}) };
   try {
     const fileInput = document.getElementById('edit-resource-file');
     const newFile = await resolveFileField('edit-resource-file', 'edit-resource-url', {
@@ -2678,6 +2783,14 @@ async function saveEditResource() {
       custom_name: fileInput.files[0]?.name || ''
     });
     if (newFile) updates.file = newFile;
+    if (document.getElementById('edit-resource-rel-group').style.display !== 'none') {
+      const relInput = document.getElementById('edit-resource-rel-file');
+      const newRel = await resolveFileField('edit-resource-rel-file', 'edit-resource-rel-url', {
+        subject_id: subj.slug, level_id: level.slug, section_id: sectionId,
+        file_type: 'relationship_booklet', custom_name: relInput.files[0]?.name || ''
+      });
+      if (newRel) updates.relationshipBooklet = newRel;
+    }
   } catch (e) { notify(e.message, 'error'); return; }
 
   await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections/${sectionId}/items/${itemId}`, {

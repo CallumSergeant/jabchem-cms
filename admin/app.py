@@ -5,6 +5,7 @@ import subprocess
 import socket
 import sys
 import tempfile
+import threading
 import base64
 import math
 from datetime import datetime
@@ -28,15 +29,24 @@ BUILDER      = BASE_DIR / 'builder' / 'build.py'
 
 ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'svg', 'zip'}
 
+# Live-site repo path (separate GitHub Pages repo)
+LIVE_REPO_DIR = Path(os.getenv('LIVE_REPO_PATH', str(BASE_DIR / 'live-site')))
+
+_content_lock = threading.Lock()
+
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 def read_content():
-    with open(CONTENT_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
+    with _content_lock:
+        with open(CONTENT_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
 
 def write_content(data):
-    with open(CONTENT_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    with _content_lock:
+        tmp = CONTENT_FILE.with_suffix('.tmp')
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        tmp.replace(CONTENT_FILE)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -291,7 +301,7 @@ def update_section(subject_id, level_id, section_id):
     if not section:
         return jsonify({'error': 'Section not found'}), 404
     data = request.json
-    for field in ('title', 'jabchemMarkingScheme', 'resourceType', 'description', 'footnote', 'columns'):
+    for field in ('title', 'jabchemMarkingScheme', 'resourceType', 'description', 'footnote', 'columns', 'rows', 'relationshipBooklet'):
         if field in data:
             section[field] = data[field]
     write_content(content)
@@ -451,12 +461,17 @@ def add_section_item(subject_id, level_id, section_id):
         return jsonify({'error': 'Not found'}), 404
     data = request.json
     items = section.setdefault('items', [])
-    items.append({
+    item = {
         'id': data.get('id', f"item_{len(items)+1}"),
         'title': data.get('title', 'Untitled'),
         'file': data.get('file', None),
         'published': True
-    })
+    }
+    if data.get('level'):
+        item['level'] = data['level']
+    if data.get('relationshipBooklet'):
+        item['relationshipBooklet'] = data['relationshipBooklet']
+    items.append(item)
     write_content(content)
     return jsonify({'status': 'ok'})
 
@@ -471,9 +486,12 @@ def update_section_item(subject_id, level_id, section_id, item_id):
     data = request.json
     for item in section.get('items', []):
         if item['id'] == item_id:
-            for field in ('title', 'file', 'published'):
+            for field in ('title', 'file', 'published', 'level', 'relationshipBooklet'):
                 if field in data:
-                    item[field] = data[field]
+                    if data[field] is None:
+                        item.pop(field, None)
+                    else:
+                        item[field] = data[field]
             break
     write_content(content)
     return jsonify({'status': 'ok'})
@@ -662,7 +680,7 @@ def serve_file(filepath):
 def build_site():
     try:
         result = subprocess.run(
-            ['python', str(BUILDER)],
+            [sys.executable, str(BUILDER)],
             capture_output=True, text=True, cwd=str(BASE_DIR)
         )
         if result.returncode != 0:
@@ -687,6 +705,16 @@ def _get_local_ip():
             return s.getsockname()[0]
     except Exception:
         return 'localhost'
+
+
+def _preview_url(port):
+    """Return the URL for the preview server.
+    Respects PREVIEW_DOMAIN env var so a reverse-proxy domain works in production.
+    """
+    domain = os.getenv('PREVIEW_DOMAIN', '')
+    if domain:
+        return f'https://{domain}'
+    return f'http://{_get_local_ip()}:{port}'
 
 
 def _find_free_port(start=5050):
@@ -736,7 +764,7 @@ def preview_site():
     """Build the site then start (or restart) a local preview server."""
     # 1. Build
     result = subprocess.run(
-        ['python', str(BUILDER)],
+        [sys.executable, str(BUILDER)],
         capture_output=True, text=True, cwd=str(BASE_DIR)
     )
     if result.returncode != 0:
@@ -754,11 +782,10 @@ def preview_site():
     _PREVIEW_PID_FILE.write_text(str(proc.pid))
     _PREVIEW_PORT_FILE.write_text(str(port))
 
-    ip = _get_local_ip()
     return jsonify({
         'status': 'ok',
         'port': port,
-        'url': f'http://{ip}:{port}',
+        'url': _preview_url(port),
         'pages': result.stdout.strip()
     })
 
@@ -768,8 +795,7 @@ def preview_status():
     """Return whether a preview server is running and on which port."""
     port = _preview_port()
     if port:
-        ip = _get_local_ip()
-        return jsonify({'running': True, 'port': port, 'url': f'http://{ip}:{port}'})
+        return jsonify({'running': True, 'port': port, 'url': _preview_url(port)})
     return jsonify({'running': False})
 
 
@@ -779,42 +805,81 @@ def stop_preview():
     return jsonify({'status': 'ok'})
 
 
-# ── Publish to GitHub ────────────────────────────────────────────────────────
+# ── Publish to GitHub Pages (live repo) ──────────────────────────────────────
 @app.route('/api/publish', methods=['POST'])
 def publish():
     import git
 
-    token   = os.getenv('GITHUB_TOKEN', '')
-    repo_id = os.getenv('GITHUB_REPO', '')   # e.g. yourusername/jabchem
+    token         = os.getenv('GITHUB_TOKEN', '')
+    live_repo_id  = os.getenv('LIVE_GITHUB_REPO', '')   # e.g. username/jabchem-live
+    live_branch   = os.getenv('LIVE_GITHUB_BRANCH', 'main')
+    git_name      = os.getenv('GIT_USER_NAME', 'JABchem CMS')
+    git_email     = os.getenv('GIT_USER_EMAIL', 'cms@jabchem.org.uk')
 
-    if not token or not repo_id:
-        return jsonify({'error': 'GITHUB_TOKEN and GITHUB_REPO must be set in .env'}), 400
+    if not token or not live_repo_id:
+        return jsonify({'error': 'GITHUB_TOKEN and LIVE_GITHUB_REPO must be set in .env'}), 400
 
     message = request.json.get('message', f'Content update {datetime.now().strftime("%Y-%m-%d %H:%M")}')
+    remote_url = f'https://{token}@github.com/{live_repo_id}.git'
 
     try:
-        # Build first
+        # 1. Build
         build_result = subprocess.run(
-            ['python', str(BUILDER)],
+            [sys.executable, str(BUILDER)],
             capture_output=True, text=True, cwd=str(BASE_DIR)
         )
         if build_result.returncode != 0:
             return jsonify({'status': 'error', 'message': 'Build failed: ' + build_result.stderr}), 500
 
-        # Push via git
-        repo = git.Repo(str(BASE_DIR))
-        repo.git.add('site/')
-        repo.git.add('content/content.json')
+        # 2. Ensure the live repo is cloned locally
+        LIVE_REPO_DIR.mkdir(parents=True, exist_ok=True)
+        if not (LIVE_REPO_DIR / '.git').exists():
+            git.Repo.clone_from(remote_url, str(LIVE_REPO_DIR), branch=live_branch)
 
-        if repo.is_dirty(index=True):
-            repo.index.commit(message)
-            origin = repo.remote('origin')
-            # Inject token into remote URL
-            remote_url = f"https://{token}@github.com/{repo_id}.git"
-            with repo.git.custom_environment(GIT_ASKPASS='echo'):
-                repo.git.push('--set-upstream', remote_url, 'HEAD:main')
+        live_repo = git.Repo(str(LIVE_REPO_DIR))
+        live_repo.remotes.origin.set_url(remote_url)
 
-        return jsonify({'status': 'ok', 'message': 'Pushed to GitHub successfully'})
+        # Configure committer identity
+        with live_repo.config_writer() as cw:
+            cw.set_value('user', 'name', git_name)
+            cw.set_value('user', 'email', git_email)
+
+        # Pull latest to avoid conflicts
+        live_repo.remotes.origin.pull(live_branch)
+
+        # 3. Preserve CNAME (GitHub Pages custom domain file)
+        cname_file = LIVE_REPO_DIR / 'CNAME'
+        cname = cname_file.read_text() if cname_file.exists() else None
+
+        # 4. Clear the live repo contents (leave .git intact)
+        for item in LIVE_REPO_DIR.iterdir():
+            if item.name == '.git':
+                continue
+            if item.is_dir():
+                shutil.rmtree(item)
+            else:
+                item.unlink()
+
+        # 5. Copy built site/ into live repo
+        for item in SITE_DIR.iterdir():
+            dest = LIVE_REPO_DIR / item.name
+            if item.is_dir():
+                shutil.copytree(item, dest)
+            else:
+                shutil.copy2(item, dest)
+
+        # Restore CNAME
+        if cname is not None:
+            cname_file.write_text(cname)
+
+        # 6. Commit and push
+        live_repo.git.add(A=True)
+        if live_repo.is_dirty(index=True) or live_repo.untracked_files:
+            live_repo.index.commit(message)
+            live_repo.remotes.origin.push(f'HEAD:{live_branch}')
+            return jsonify({'status': 'ok', 'message': 'Published to GitHub Pages successfully'})
+        else:
+            return jsonify({'status': 'ok', 'message': 'Nothing to publish — site is already up to date'})
 
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -1124,5 +1189,6 @@ def pdf_annotate():
 
 
 if __name__ == '__main__':
+    debug = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'
     print("\n  JABchem Admin\n  Running at: http://localhost:5000\n")
-    app.run(debug=True, port=5000, host="0.0.0.0")
+    app.run(debug=debug, port=5000, host="0.0.0.0")

@@ -1,0 +1,12 @@
+services:
+  cms:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "5000:5000"   # Admin UI  → cms.sgt.me.uk (reverse proxy to this)
+      - "5050:5050"   # Preview   → demo.sgt.me.uk (reverse proxy to this)
+    volumes:
+      - ./content:/app/content       # persists content.json + uploaded PDFs
+      - ./live-site:/app/live-site   # persists the cloned live GitHub Pages repo
+    env_file:
+      - .env

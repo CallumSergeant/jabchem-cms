@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ subject.title }}{% endblock %}
+{% block title %}{{ subject.title }} — {{ site.title }}{% endblock %}
 {% block description %}{{ subject.description }}{% endblock %}
 {% block extra_styles %}
 <style>
@@ -35,7 +35,15 @@
   {% for level in subject.levels if level.published %}
   <a href="/{{ subject.slug }}/{{ level.slug }}/" class="level-card">
     <div class="level-card-icon">
-      <i class="fa fa-graduation-cap"></i>
+      {% if level.slug == 'national5' %}
+        <span class="level-card-icon-text">N5</span>
+      {% elif level.slug == 'higher' %}
+        <span class="level-card-icon-text">H</span>
+      {% elif level.slug == 'advancedhigher' %}
+        <span class="level-card-icon-text">AH</span>
+      {% else %}
+        <i class="fa fa-graduation-cap"></i>
+      {% endif %}
     </div>
     <h3>{{ level.title }}</h3>
     <p>{{ level.description }}</p>

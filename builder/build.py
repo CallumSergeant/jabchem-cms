@@ -36,12 +36,13 @@ def build_search_index(subjects):
                 'resourceCount': sum(len(s.get('papers', [])) + len(s.get('items', [])) + len(s.get('rows', [])) for s in level.get('sections', [])),
                 'url': f"/{subj['slug']}/{level['slug']}/",
             })
-            # Collect papers from all sections
+            # Collect papers from all sections, preserving section title
             all_level_papers = []
             for sec in level.get('sections', []):
-                all_level_papers.extend(sec.get('papers', []))
+                for p in sec.get('papers', []):
+                    all_level_papers.append((p, sec.get('title', '')))
 
-            for paper in all_level_papers:
+            for paper, sec_title in all_level_papers:
                 if not paper.get('published', True):
                     continue
                 base = {
@@ -53,6 +54,7 @@ def build_search_index(subjects):
                     'level': level['title'],
                     'levelSlug': level['slug'],
                     'year': paper['year'],
+                    'sectionTitle': sec_title,
                 }
                 # Multi-part papers (e.g. Maths Paper 1 / Paper 2)
                 if 'paperStructure' in subj:

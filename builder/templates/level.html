@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ level.title }} {{ subject.title }}{% endblock %}
+{% block title %}{{ level.title }} {{ subject.title }} — {{ site.title }}{% endblock %}
 {% block description %}{{ level.description }}{% endblock %}
 {% block extra_styles %}
 <style>
@@ -60,7 +60,7 @@
         <tbody>
           {% for paper in papers %}
           <tr>
-            <td><span class="year-badge">{{ paper.year }}</span>{% if paper.label %} <span class="year-label">{{ paper.label }}</span>{% endif %}</td>
+            <td><div class="year-cell"><span class="year-badge">{{ paper.year }}</span>{% if paper.label %}<span class="year-label">{{ paper.label }}</span>{% endif %}</div></td>
             {% if subject.paperStructure %}
               {% for part in subject.paperStructure.parts %}
               <td>{% if paper[part.id] %}<a href="{{ paper[part.id] }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> Paper</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
@@ -107,7 +107,7 @@
             <tbody>
               {% for paper in papers %}
               <tr>
-                <td><span class="year-badge">{{ paper.year }}</span>{% if paper.label %} <span class="year-label">{{ paper.label }}</span>{% endif %}</td>
+                <td><div class="year-cell"><span class="year-badge">{{ paper.year }}</span>{% if paper.label %}<span class="year-label">{{ paper.label }}</span>{% endif %}</div></td>
                 {% if subject.paperStructure %}
                   {% for part in subject.paperStructure.parts %}
                   <td>{% if paper[part.id] %}<a href="{{ paper[part.id] }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> Paper</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
@@ -138,7 +138,7 @@
       <table class="paper-table">
         <thead>
           <tr>
-            <th style="width:44px">#</th>
+            <th style="width:64px;white-space:nowrap">#</th>
             {% for col in columns %}<th>{{ col.label }}</th>{% endfor %}
           </tr>
         </thead>
@@ -153,7 +153,8 @@
               {% elif col.type == 'file' %}
                 {% if val and val.file %}<a href="{{ val.file }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> {{ val.label or 'Download' }}</a>{% endif %}
               {% elif col.type == 'files' %}
-                {% if val %}<div class="ct-files">{% for f in val %}{% if f.file %}<a href="{{ f.file }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> {{ f.label or 'Download' }}</a>{% endif %}{% endfor %}</div>{% endif %}
+                {% set arr = val if val is sequence and val is not string else ([val] if val else []) %}
+                {% if arr %}<div class="ct-files">{% for f in arr %}{% if f.file %}<a href="{{ f.file }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> {{ f.label or 'Download' }}</a>{% endif %}{% endfor %}</div>{% endif %}
               {% endif %}
             </td>
             {% endfor %}
@@ -172,10 +173,16 @@
     <div class="resource-list">
       {% for item in items %}
       <div class="resource-item">
+        {% if item.level %}<span class="item-level-badge">{{ item.level }}</span>{% endif %}
         <span class="resource-item-title">{{ item.title }}</span>
         {% if item.file %}
         <a href="{{ item.file }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener">
-          <i class="fa fa-file-pdf"></i> Download
+          <i class="fa fa-file-pdf"></i> {% if rt == 'dataBooklets' %}Data Booklet{% else %}Download{% endif %}
+        </a>
+        {% endif %}
+        {% if item.relationshipBooklet %}
+        <a href="{{ item.relationshipBooklet }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener">
+          <i class="fa fa-file-pdf"></i> Relationship Booklet
         </a>
         {% endif %}
       </div>
