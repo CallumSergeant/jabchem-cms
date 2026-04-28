@@ -874,12 +874,26 @@ def publish():
 
         # 6. Commit and push
         live_repo.git.add(A=True)
-        if live_repo.git.status('--porcelain').strip():
+        porcelain = live_repo.git.status('--porcelain')
+        live_files = [f.name for f in LIVE_REPO_DIR.iterdir() if f.name != '.git'][:10]
+        site_files = [f.name for f in SITE_DIR.iterdir()][:10] if SITE_DIR.exists() else []
+        if porcelain.strip():
             live_repo.index.commit(message)
             live_repo.remotes.origin.push(f'HEAD:{live_branch}')
             return jsonify({'status': 'ok', 'message': 'Published to GitHub Pages successfully'})
         else:
-            return jsonify({'status': 'ok', 'message': 'Nothing to publish — site is already up to date'})
+            return jsonify({
+                'status': 'ok',
+                'message': 'Nothing to publish — site is already up to date',
+                'debug': {
+                    'porcelain': porcelain,
+                    'live_repo_dir': str(LIVE_REPO_DIR),
+                    'live_files': live_files,
+                    'site_dir': str(SITE_DIR),
+                    'site_files': site_files,
+                    'site_exists': SITE_DIR.exists(),
+                }
+            })
 
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
