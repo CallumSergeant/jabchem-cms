@@ -4,7 +4,7 @@
 <script>if(localStorage.getItem('theme')==='dark')document.documentElement.setAttribute('data-theme','dark');</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{% block title %}{{ site.title }}{% endblock %} — {{ site.tagline }}</title>
+<title>{% block title %}{{ site.title }}{% endblock %}</title>
 <meta name="description" content="{% block description %}{{ site.description }}{% endblock %}">
 <link rel="icon" href="/assets/favicon.png">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -104,6 +104,7 @@
   .level-card:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: var(--shadow-lg); }
   .level-card-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--accent-pale); display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
   .level-card-icon i { font-size: 16px; color: var(--accent); }
+  .level-card-icon-text { font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: 0.02em; }
   .level-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 5px; }
   .level-card p { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
   .level-card-stats { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
@@ -117,9 +118,9 @@
     .level-layout { grid-template-columns: 1fr 196px; }
   }
   /* ── TOC sidebar ─────────────────────────────────── */
-  .level-toc { min-width: 0; }
+  .level-toc { min-width: 0; order: -1; }
   @media (min-width: 860px) {
-    .level-toc { position: sticky; top: 76px; }
+    .level-toc { position: sticky; top: 76px; order: 0; }
   }
   .toc-inner { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow-sm); }
   .toc-label { font-size: 10.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; margin: 0 0 10px; }
@@ -138,7 +139,7 @@
   .paper-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   .paper-table thead { background: #f9fafb; }
   .paper-table th { font-size: 10.5px; font-weight: 600; color: var(--text-muted); padding: 6px 14px; text-align: left; border-bottom: 1.5px solid var(--border); text-transform: uppercase; letter-spacing: 0.06em; }
-  .paper-table td { padding: 5px 14px; border-bottom: 1px solid var(--border-light); vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+  .paper-table td { padding: 5px 14px; border-bottom: 1px solid var(--border-light); vertical-align: middle; overflow: hidden; text-overflow: ellipsis; font-size: 13.5px; }
   .paper-table tbody tr:last-child td { border-bottom: none; }
   .paper-table tbody tr:hover td { background: #fafbfc; }
   .col-year { width: 68px; }
@@ -168,6 +169,7 @@
   .resource-item:last-child { border-bottom: none; }
   .resource-item:hover { background: #fafbfc; }
   .resource-item-title { font-size: 13.5px; font-weight: 500; flex: 1; }
+  .item-level-badge { font-size: 10px; font-weight: 700; color: var(--accent); background: var(--accent-pale, rgba(83,74,183,0.08)); border-radius: 5px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0; }
 
   /* ── Custom table section ────────────────────────── */
   .section-description { font-size: 13.5px; color: var(--text-muted); line-height: 1.65; margin: -4px 0 16px; }
@@ -175,7 +177,7 @@
   .resource-link { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--accent); text-decoration: none; padding: 1px 0; }
   .resource-link:hover { text-decoration: underline; }
   .resource-link i { font-size: 11px; }
-  .ct-files { display: flex; flex-direction: column; gap: 3px; }
+  .ct-files { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
 
   /* ── Archive ─────────────────────────────────────── */
   .archive-summary { display: flex; align-items: center; gap: 10px; padding: 12px 0; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--text-muted); list-style: none; user-select: none; }
@@ -209,7 +211,7 @@
   .footer-col-icon { font-size: 13px; color: rgba(255,255,255,0.4); }
   .footer-link { display: block; font-size: 13.5px; color: rgba(255,255,255,0.65); margin-bottom: 8px; transition: color 0.12s; }
   .footer-link:hover { color: white; }
-  .footer-callout { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: var(--radius-xl); padding: 20px 22px; min-width: 210px; max-width: 280px; flex-shrink: 0; }
+  .footer-callout { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: var(--radius-xl); padding: 20px 22px; margin-bottom: 28px; }
   .footer-callout-title { font-size: 16px; font-weight: 700; color: white; margin-bottom: 10px; }
   .footer-callout-text { font-size: 13.5px; color: rgba(255,255,255,0.6); line-height: 1.65; }
   .footer-divider { height: 1px; background: rgba(255,255,255,0.1); margin-bottom: 28px; }
@@ -269,6 +271,9 @@
   .home-hero-num { font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.8); }
 
   /* ── Responsive ──────────────────────────────────── */
+  @media (min-width: 641px) {
+    .year-label { margin-left: 6px; }
+  }
   @media (max-width: 640px) {
     .page { padding: 24px 16px 48px; }
     .home-hero { padding: 44px 20px 40px; }
@@ -284,8 +289,9 @@
     .paper-table { table-layout: auto; }
     .col-year, .col-paper, .col-ms { width: auto; }
     .paper-table th { padding: 5px 8px; font-size: 10px; }
-    .paper-table td { padding: 5px 8px; overflow: visible; text-overflow: clip; }
+    .paper-table td { padding: 8px 8px; overflow: visible; text-overflow: clip; }
     .year-badge { font-size: 13px; }
+    .year-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
     .btn { font-size: 11px; padding: 3px 8px; gap: 3px; border-radius: 5px; border-width: 1px; }
     .btn i { font-size: 10px; }
 
@@ -294,7 +300,7 @@
     .footer-inner { padding: 32px 20px 0; }
     .footer-top { gap: 20px 16px; margin-bottom: 28px; }
     .footer-col { flex: 0 0 calc(50% - 8px); }
-    .footer-callout { max-width: 100%; width: 100%; min-width: 0; padding: 16px 18px; margin-top: 4px; }
+    .footer-callout { padding: 16px 18px; }
   }
 </style>
 {% block extra_styles %}{% endblock %}
@@ -374,13 +380,14 @@
       </div>
       {% endfor %}
 
-      {% if site.footer.calloutTitle %}
-      <div class="footer-callout">
-        <div class="footer-callout-title">{{ site.footer.calloutTitle }}</div>
-        <p class="footer-callout-text">{{ site.footer.calloutText | safe }}</p>
-      </div>
-      {% endif %}
     </div>
+
+    {% if site.footer.calloutTitle %}
+    <div class="footer-callout">
+      <div class="footer-callout-title">{{ site.footer.calloutTitle }}</div>
+      <p class="footer-callout-text">{{ site.footer.calloutText | safe }}</p>
+    </div>
+    {% endif %}
 
     {% if site.footer.legalText %}
     <div class="footer-divider"></div>
@@ -424,8 +431,45 @@
     }).catch(function () { index = []; cb(); });
   }
 
+  var searchAliases = {
+    'n5':           ['national', '5'],
+    'nat5':         ['national', '5'],
+    'national5':    ['national', '5'],
+    'h':            ['higher'],
+    'ah':           ['advanced', 'higher'],
+    'advandedhigher': ['advanced', 'higher'],
+    'int2':         ['intermediate', '2'],
+    'int1':         ['intermediate', '1'],
+    'int':          ['intermediate'],
+    'sg':           ['standard', 'grade'],
+    'stdgrade':     ['standard', 'grade'],
+    'ms':           ['marking', 'scheme'],
+    'markingscheme':['marking', 'scheme'],
+    'pp':           ['past', 'paper'],
+    'pastpaper':    ['past', 'paper'],
+    'cfe':          ['curriculum', 'excellence'],
+    'bio':          ['biology'],
+    'chem':         ['chemistry'],
+    'phys':         ['physics'],
+    'maths':        ['maths'],
+    'math':         ['maths'],
+  };
+
   function tokenize(str) {
     return str.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(Boolean);
+  }
+
+  function expandTokens(tokens) {
+    var result = [];
+    tokens.forEach(function (t) {
+      var expansion = searchAliases[t];
+      if (expansion) {
+        expansion.forEach(function (e) { if (!result.includes(e)) result.push(e); });
+      } else {
+        if (!result.includes(t)) result.push(t);
+      }
+    });
+    return result;
   }
 
   function matches(record, tokens) {
@@ -433,9 +477,9 @@
       record.subject, record.level || '', String(record.year || ''),
       record.subjectSlug, record.levelSlug || '',
       record.title || '', record.resourceLabel || '', record.fileLabel || '',
-      record.resourceType || ''
+      record.resourceType || '', record.sectionTitle || ''
     ].join(' ').toLowerCase();
-    return tokens.every(function (t) { return haystack.includes(t); });
+    return expandTokens(tokens).every(function (t) { return haystack.includes(t); });
   }
 
   // Subjects and levels first (navigational), sections next, then papers/resources (file links)
@@ -458,7 +502,7 @@
   }
 
   function resultIcon(r) {
-    var faIcon = (r.type === 'paper' || r.type === 'resource') ? 'fa-file-pdf' : r.icon;
+    var faIcon = (r.type === 'paper' || r.type === 'resource') ? 'fa-file' : r.icon;
     var badge = '';
     var abbr = r.level && levelAbbr[r.level];
     if (abbr && (r.type === 'paper' || r.type === 'resource')) {
@@ -499,7 +543,7 @@
         newTab = true;
         var info = typeInfo[r.fileLabel] || { label: r.fileLabel, bg: '#F3F4F6', color: '#374151' };
         title = r.subject + ' ' + r.year;
-        meta = r.level;
+        meta = r.sectionTitle ? r.level + ' · ' + r.sectionTitle : r.level;
         badge = '<span class="sr-badge" style="background:' + info.bg + ';color:' + info.color + '">' + info.label + '</span>';
 
       } else if (r.type === 'resource') {

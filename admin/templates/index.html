@@ -170,6 +170,32 @@
   .modal-body { padding: 20px; }
   .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
 
+  /* PDF Editor */
+  .pdf-thumb-grid { display: flex; flex-wrap: wrap; gap: 8px; max-height: 260px; overflow-y: auto; min-height: 48px; }
+  .pdf-thumb { position: relative; cursor: pointer; border-radius: 4px; border: 2px solid var(--border); overflow: hidden; flex-shrink: 0; transition: border-color 0.1s; }
+  .pdf-thumb img { display: block; width: 72px; height: auto; }
+  .pdf-thumb .thumb-num { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center; font-size: 9px; font-weight: 600; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+  .pdf-thumb .thumb-badge { position: absolute; top: 2px; right: 2px; font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 3px; }
+  .pdf-thumb.selected { border-color: var(--primary); }
+  .pdf-thumb.selected::after { content: '✓'; position: absolute; top: 2px; left: 2px; background: var(--primary); color: white; font-size: 9px; font-weight: 700; width: 14px; height: 14px; border-radius: 3px; display: flex; align-items: center; justify-content: center; }
+  .pdf-thumb.blank-page { opacity: 0.45; }
+  .pdf-thumb.blank-page .thumb-badge { background: #f59e0b; color: white; }
+  .pdf-result-strip { display: flex; flex-wrap: wrap; gap: 8px; min-height: 60px; padding: 4px 0; }
+  .pdf-result-thumb { position: relative; border-radius: 4px; border: 2px solid var(--primary); overflow: hidden; flex-shrink: 0; cursor: grab; }
+  .pdf-result-thumb img { display: block; width: 60px; height: auto; }
+  .pdf-result-thumb .thumb-num { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center; font-size: 9px; font-weight: 600; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+  .pdf-result-thumb .thumb-src { position: absolute; top: 2px; left: 2px; font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 3px; color: white; }
+  .pdf-result-thumb .thumb-remove { position: absolute; top: 2px; right: 2px; width: 14px; height: 14px; background: rgba(220,50,50,0.85); color: white; font-size: 9px; border-radius: 3px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .pdf-result-thumb.dragging { opacity: 0.4; }
+  .pdf-result-thumb.drag-over { border-color: var(--warning); }
+  .pdf-loading { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); padding: 16px 0; }
+  .pdf-edit-btn { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 4px; font-size: 11px; color: var(--text-muted); border: 1px solid var(--border); background: var(--bg); cursor: pointer; transition: all 0.1s; margin-left: 4px; }
+  .pdf-edit-btn:hover { color: var(--primary); border-color: var(--primary); background: var(--primary-light); }
+  .ann-tool-btn { display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-muted); font-size: 12px; cursor: pointer; transition: all 0.1s; font-family: inherit; }
+  .ann-tool-btn:hover { border-color: var(--primary); color: var(--primary); }
+  .ann-tool-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+  .ann-tool-btn[data-tool="redact"].active { background: #1a1a1a; border-color: #1a1a1a; }
+
   /* ── Forms ── */
   .form-group { margin-bottom: 14px; }
   .form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; }
@@ -371,6 +397,21 @@
       <div class="form-group">
         <label>Title</label>
         <input type="text" id="resource-title" placeholder="e.g. Unit 1 — Chemical Changes">
+      </div>
+      <div class="form-group" id="add-resource-rel-group" style="display:none">
+        <label>Relationship Booklet (PDF)</label>
+        <input type="file" id="resource-rel-file" accept=".pdf">
+        <div class="url-or-divider"><span>or paste URL</span></div>
+        <input type="url" id="resource-rel-url" class="url-fetch-input" placeholder="https://…">
+      </div>
+      <div class="form-group" id="add-resource-level-group" style="display:none">
+        <label>Level</label>
+        <select id="resource-level">
+          <option value="">— None —</option>
+          <option value="N5">N5</option>
+          <option value="H">H</option>
+          <option value="AH">AH</option>
+        </select>
       </div>
       <div class="form-group">
         <label>File (PDF)</label>
@@ -661,6 +702,16 @@
         <label>Section title</label>
         <input type="text" id="rename-section-title">
       </div>
+      <div id="rename-databooklet-row" class="resource-toggle-row" style="display:none">
+        <div class="resource-toggle-info">
+          <strong>Relationship booklet column</strong>
+          <span>Show a separate column for relationship booklets alongside each item</span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="rename-section-relationship">
+          <div class="toggle-slider"></div>
+        </label>
+      </div>
       <div id="rename-jabchem-row" class="resource-toggle-row" style="display:none">
         <div class="resource-toggle-info">
           <strong>JABchem marking schemes</strong>
@@ -741,6 +792,23 @@
         <label>Title</label>
         <input type="text" id="edit-resource-title">
       </div>
+      <div class="form-group" id="edit-resource-rel-group" style="display:none">
+        <label>Relationship Booklet (PDF)</label>
+        <div style="margin-bottom:6px" id="edit-resource-rel-current"></div>
+        <input type="file" id="edit-resource-rel-file" accept=".pdf">
+        <div class="url-or-divider"><span>or paste URL</span></div>
+        <input type="url" id="edit-resource-rel-url" class="url-fetch-input" placeholder="https://…">
+        <div class="hint">Leave both blank to keep the current file</div>
+      </div>
+      <div class="form-group" id="edit-resource-level-group" style="display:none">
+        <label>Level</label>
+        <select id="edit-resource-level">
+          <option value="">— None —</option>
+          <option value="N5">N5</option>
+          <option value="H">H</option>
+          <option value="AH">AH</option>
+        </select>
+      </div>
       <div class="form-group">
         <label>File (PDF)</label>
         <div style="margin-bottom:6px" id="edit-resource-current-file"></div>
@@ -754,6 +822,200 @@
       <button class="btn" onclick="closeModal('modal-edit-resource')">Cancel</button>
       <button class="btn btn-primary" onclick="saveEditResource()">Save changes</button>
     </div>
+  </div>
+</div>
+
+<!-- ── PDF Editor Modal ───────────────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-pdf-editor" style="display:none" onclick="closeModalOutside(event,'modal-pdf-editor')">
+  <div class="modal" style="width:900px;max-width:98vw">
+    <div class="modal-header">
+      <h3><i class="fa fa-scissors" style="margin-right:7px;color:var(--primary)"></i>PDF Editor</h3>
+      <button class="icon-btn" onclick="closeModal('modal-pdf-editor')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body" style="padding:0">
+
+      <!-- Sources row -->
+      <div style="border-bottom:1px solid var(--border)">
+
+        <!-- Source A -->
+        <div style="padding:16px;border-bottom:1px solid var(--border-light)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Source</span>
+            <span id="pdf-a-count" style="font-size:11px;color:var(--text-light)"></span>
+          </div>
+          <select id="pdf-a-picker" style="width:100%;margin-bottom:10px;font-size:12px" onchange="loadPdfSource('a')">
+            <option value="">— select a PDF —</option>
+          </select>
+          <div id="pdf-a-actions" style="display:none;margin-bottom:8px;gap:6px">
+            <button class="btn btn-sm" onclick="selectAllPages('a')">All</button>
+            <button class="btn btn-sm" onclick="selectNonePages('a')">None</button>
+            <button class="btn btn-sm" onclick="autoSelectPages('a')"><i class="fa fa-magic" style="font-size:10px"></i> Auto</button>
+          </div>
+          <div id="pdf-a-grid" class="pdf-thumb-grid"></div>
+        </div>
+
+        <!-- Source B — collapsible -->
+        <details id="pdf-source-b-details" style="padding:0">
+          <summary style="padding:12px 16px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;list-style:none;display:flex;align-items:center;gap:7px;user-select:none">
+            <i class="fa fa-chevron-right" id="pdf-b-chevron" style="font-size:10px;transition:transform 0.15s"></i>
+            Combine with a second PDF
+            <span style="font-weight:400;color:var(--text-light)">(optional)</span>
+            <span id="pdf-b-count" style="margin-left:auto;font-size:11px;color:var(--text-light)"></span>
+          </summary>
+          <div style="padding:0 16px 16px">
+            <select id="pdf-b-picker" style="width:100%;margin-bottom:10px;font-size:12px" onchange="loadPdfSource('b')">
+              <option value="">— select a PDF to combine —</option>
+            </select>
+            <div id="pdf-b-actions" style="display:none;margin-bottom:8px;gap:6px">
+              <button class="btn btn-sm" onclick="selectAllPages('b')">All</button>
+              <button class="btn btn-sm" onclick="selectNonePages('b')">None</button>
+              <button class="btn btn-sm" onclick="autoSelectPages('b')"><i class="fa fa-magic" style="font-size:10px"></i> Auto</button>
+            </div>
+            <div id="pdf-b-grid" class="pdf-thumb-grid"></div>
+          </div>
+        </details>
+
+      </div>
+
+      <!-- Result strip -->
+      <div style="padding:16px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <span style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Result</span>
+          <button class="btn btn-sm btn-primary" onclick="buildResult()" style="padding:3px 10px;font-size:11px"><i class="fa fa-play" style="font-size:9px"></i> Build from selected</button>
+          <span id="pdf-result-count" style="font-size:11px;color:var(--text-light);margin-left:auto"></span>
+        </div>
+        <div id="pdf-result-strip" class="pdf-result-strip">
+          <p style="font-size:12px;color:var(--text-light);padding:12px 0">Select pages above and click Build, or drag pages here directly.</p>
+        </div>
+      </div>
+
+      <!-- Watermark section (collapsible) -->
+      <details id="pdf-watermark-details" style="border-top:1px solid var(--border)">
+        <summary style="padding:12px 16px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;list-style:none;display:flex;align-items:center;gap:7px;user-select:none">
+          <i class="fa fa-chevron-right" id="pdf-wm-chevron" style="font-size:10px;transition:transform 0.15s"></i>
+          Add watermark / stamp
+          <span style="font-weight:400;color:var(--text-light)">(applies to all pages)</span>
+        </summary>
+        <div style="padding:0 16px 16px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
+          <div class="form-group" style="flex:1;min-width:140px;margin:0">
+            <label>Text</label>
+            <input type="text" id="wm-text" value="DRAFT" placeholder="e.g. DRAFT, DO NOT SHARE">
+          </div>
+          <div class="form-group" style="flex:0 0 80px;margin:0">
+            <label>Colour</label>
+            <input type="color" id="wm-colour" value="#cc0000" style="width:100%;height:34px;padding:2px 4px;cursor:pointer">
+          </div>
+          <div class="form-group" style="flex:0 0 120px;margin:0">
+            <label>Opacity <span id="wm-opacity-val" style="font-weight:400;color:var(--text-light)">25%</span></label>
+            <input type="range" id="wm-opacity" min="5" max="100" value="25" style="width:100%" oninput="document.getElementById('wm-opacity-val').textContent=this.value+'%'">
+          </div>
+          <div class="form-group" style="flex:0 0 100px;margin:0">
+            <label>Size (pt)</label>
+            <input type="number" id="wm-size" value="60" min="10" max="200">
+          </div>
+          <div class="form-group" style="flex:0 0 110px;margin:0">
+            <label>Angle</label>
+            <select id="wm-angle" style="font-size:12px">
+              <option value="45">Diagonal (45°)</option>
+              <option value="0">Horizontal (0°)</option>
+              <option value="-45">Diagonal (-45°)</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="btn-wm-apply" onclick="applyWatermark()" style="margin-bottom:1px"><i class="fa fa-stamp"></i> Apply</button>
+        </div>
+      </details>
+
+      <!-- Save row -->
+      <div style="padding:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--border)">
+        <button class="btn" id="btn-open-annotate" onclick="openAnnotateFromEditor()" style="margin-right:auto">
+          <i class="fa fa-pen-ruler"></i> Annotate
+        </button>
+        <span style="font-size:12px;font-weight:600;color:var(--text-muted);white-space:nowrap">Save pages as:</span>
+        <select id="pdf-save-mode" style="font-size:12px;flex:0 0 auto" onchange="pdfSaveModeChanged()">
+          <option value="overwrite-a">Overwrite Source A</option>
+          <option value="overwrite-b">Overwrite Source B</option>
+          <option value="new">Save as new file</option>
+        </select>
+        <input type="text" id="pdf-save-path" placeholder="e.g. chemistry/national5/2023_paper_clean.pdf" style="flex:1;min-width:200px;font-size:12px;display:none">
+        <div style="display:flex;gap:8px">
+          <button class="btn" onclick="closeModal('modal-pdf-editor')">Cancel</button>
+          <button class="btn btn-primary" id="btn-pdf-save" onclick="savePdfEdit()"><i class="fa fa-save"></i> Save PDF</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── PDF Annotation Modal ───────────────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-pdf-annotate" style="display:none" onclick="closeModalOutside(event,'modal-pdf-annotate')">
+  <div class="modal" style="width:960px;max-width:99vw;max-height:96vh;display:flex;flex-direction:column">
+    <div class="modal-header" style="flex-shrink:0">
+      <h3><i class="fa fa-pen-ruler" style="margin-right:7px;color:var(--primary)"></i>Annotate PDF
+        <span id="ann-filename" style="font-size:12px;font-weight:400;color:var(--text-muted);margin-left:8px"></span>
+      </h3>
+      <button class="icon-btn" onclick="closeModal('modal-pdf-annotate')"><i class="fa fa-times"></i></button>
+    </div>
+
+    <div style="display:flex;flex:1;overflow:hidden;min-height:0">
+
+      <!-- Tool palette -->
+      <div style="width:130px;min-width:130px;border-right:1px solid var(--border);padding:14px 10px;display:flex;flex-direction:column;gap:8px;background:var(--bg);overflow-y:auto">
+        <p style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin-bottom:2px">Tools</p>
+        <button class="ann-tool-btn active" data-tool="rect"   onclick="setAnnTool('rect')"  ><i class="fa fa-vector-square"></i> Rectangle</button>
+        <button class="ann-tool-btn"        data-tool="arrow"  onclick="setAnnTool('arrow')" ><i class="fa fa-arrow-right"></i> Arrow</button>
+        <button class="ann-tool-btn"        data-tool="text"   onclick="setAnnTool('text')"  ><i class="fa fa-font"></i> Text</button>
+        <button class="ann-tool-btn"        data-tool="redact" onclick="setAnnTool('redact')"><i class="fa fa-eraser"></i> Redact</button>
+
+        <hr style="border:none;border-top:1px solid var(--border);margin:4px 0">
+
+        <p style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin-bottom:2px">Style</p>
+        <div>
+          <label style="font-size:11px;color:var(--text-muted)">Colour</label>
+          <input type="color" id="ann-colour" value="#e63946" style="width:100%;height:30px;padding:2px 3px;cursor:pointer;border-radius:4px;border:1px solid var(--border)">
+        </div>
+        <div id="ann-thickness-row">
+          <label style="font-size:11px;color:var(--text-muted)">Thickness <span id="ann-thick-val">2</span>px</label>
+          <input type="range" id="ann-thickness" min="1" max="10" value="2" style="width:100%" oninput="document.getElementById('ann-thick-val').textContent=this.value">
+        </div>
+        <div id="ann-fontsize-row" style="display:none">
+          <label style="font-size:11px;color:var(--text-muted)">Font size</label>
+          <input type="number" id="ann-fontsize" value="14" min="6" max="72" style="width:100%">
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--border);margin:4px 0">
+
+        <button class="btn btn-sm" onclick="undoAnnotation()" style="width:100%"><i class="fa fa-undo"></i> Undo</button>
+        <button class="btn btn-sm" onclick="clearPageAnnotations()" style="width:100%;color:var(--danger)"><i class="fa fa-trash"></i> Clear page</button>
+      </div>
+
+      <!-- Canvas area -->
+      <div style="flex:1;overflow:auto;background:#666;display:flex;align-items:flex-start;justify-content:center;padding:16px">
+        <div id="ann-canvas-wrap" style="position:relative;display:inline-block;box-shadow:0 4px 20px rgba(0,0,0,0.4)">
+          <img id="ann-page-img" style="display:block;max-width:100%" alt="">
+          <canvas id="ann-canvas" style="position:absolute;top:0;left:0;cursor:crosshair"></canvas>
+          <div id="ann-text-input-wrap" style="display:none;position:absolute">
+            <input id="ann-text-input" type="text" placeholder="Type annotation…"
+                   style="border:2px solid var(--primary);border-radius:3px;padding:2px 6px;font-size:14px;background:rgba(255,255,255,0.95);min-width:140px;outline:none"
+                   onkeydown="if(event.key==='Enter')commitTextAnnotation();if(event.key==='Escape')cancelTextAnnotation()">
+          </div>
+        </div>
+        <div id="ann-page-loading" style="color:white;font-size:13px;padding:40px;display:none"><div class="spinner"></div> Loading page…</div>
+      </div>
+    </div>
+
+    <!-- Footer: page nav + save -->
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;background:var(--surface)">
+      <button class="btn btn-sm" id="ann-prev" onclick="annChangePage(-1)"><i class="fa fa-chevron-left"></i></button>
+      <span id="ann-page-label" style="font-size:12px;color:var(--text-muted);min-width:80px;text-align:center">Page 1 / 1</span>
+      <button class="btn btn-sm" id="ann-next" onclick="annChangePage(1)"><i class="fa fa-chevron-right"></i></button>
+      <span style="font-size:11px;color:var(--text-light);margin-left:4px" id="ann-dirty-label"></span>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn" onclick="closeModal('modal-pdf-annotate')">Cancel</button>
+        <button class="btn btn-primary" id="btn-ann-save" onclick="saveAnnotations()"><i class="fa fa-save"></i> Burn annotations</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -890,9 +1152,6 @@ function renderSubjectView() {
   setTopActions(`
     <button class="btn btn-sm" onclick="openSubjectSettings('${subj.id}')">
       <i class="fa fa-cog"></i> Settings
-    </button>
-    <button class="btn btn-sm btn-primary" onclick="openAddPaperModal()">
-      <i class="fa fa-plus"></i> Add paper
     </button>
   `);
 
@@ -1102,14 +1361,7 @@ function renderResourceContent() {
             </div>`}
         </div>
       </div>
-      <div class="upload-zone" onclick="openAddPaperModal()"
-           ondragover="event.preventDefault();this.classList.add('drag-over')"
-           ondragleave="this.classList.remove('drag-over')"
-           ondrop="handleDrop(event)">
-        <i class="fa fa-cloud-upload-alt"></i>
-        <strong>Drop a paper here, or click to upload</strong>
-        <p class="path-preview">/files/${subj.slug}/${level.slug}/</p>
-      </div>`;
+      `;
 
   } else if (rt === 'customTable') {
     const rows = section.rows || [];
@@ -1136,7 +1388,8 @@ function renderResourceContent() {
                 if (col.type === 'text') return `<td>${escHtml(val || '')}</td>`;
                 if (col.type === 'file') return `<td>${val && val.file ? fileCell(val.file) : '<span class="missing">—</span>'}</td>`;
                 if (col.type === 'files') {
-                  const links = (val || []).filter(f => f.file).map(f => fileCell(f.file)).join('<br>');
+                  const arr = Array.isArray(val) ? val : (val && val.file ? [val] : []);
+                  const links = arr.filter(f => f.file).map(f => fileCell(f.file)).join('<br>');
                   return `<td>${links || '<span class="missing">—</span>'}</td>`;
                 }
                 return '<td>—</td>';
@@ -1190,12 +1443,13 @@ function renderResourceContent() {
         <div class="card-body">
           ${items.length ? `
             <table class="data-table">
-              <thead><tr><th>Title</th><th>File</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th>Title</th><th>File</th>${section.relationshipBooklet ? '<th>Rel. Booklet</th>' : ''}<th>Status</th><th></th></tr></thead>
               <tbody>
                 ${items.map(it => `
                   <tr>
                     <td style="font-weight:500">${it.title}</td>
                     <td>${fileCell(it.file)}</td>
+                    ${section.relationshipBooklet ? `<td>${it.relationshipBooklet ? fileCell(it.relationshipBooklet) : '<span class="missing">—</span>'}</td>` : ''}
                     <td>${it.published ? '<span class="badge badge-green">Published</span>' : '<span class="badge badge-hidden">Hidden</span>'}</td>
                     <td>
                       <div style="display:flex;gap:4px">
@@ -1248,7 +1502,13 @@ function fileUploadField(id, label, path, optional = false) {
   return `
     <div class="form-group">
       <label>${label}${optional ? ' <span style="color:var(--text-light);font-weight:400">(optional)</span>' : ''}</label>
-      <input type="file" id="${id}" accept=".pdf" onchange="onFileChosen('${id}','${path}')">
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="file" id="${id}" accept=".pdf" onchange="onFileChosen('${id}','${path}')" style="flex:1">
+        <button class="pdf-edit-btn" id="edit-btn-${id}" style="display:none;white-space:nowrap"
+                onclick="uploadAndEditPdf('${id}','${path}')">
+          <i class="fa fa-scissors"></i> Edit PDF
+        </button>
+      </div>
       <div class="url-or-divider"><span>or paste URL</span></div>
       <input type="url" id="${id}-url" class="url-fetch-input" placeholder="https://…"
              oninput="onUrlTyped('${id}','${path}')">
@@ -1259,9 +1519,54 @@ function fileUploadField(id, label, path, optional = false) {
 function onFileChosen(id, path) {
   const file = document.getElementById(id)?.files[0];
   const urlEl = document.getElementById(id + '-url');
+  const editBtn = document.getElementById('edit-btn-' + id);
   if (file) {
     if (urlEl) urlEl.value = '';
+    // Clear any previously uploaded path so it re-uploads the new file
+    delete document.getElementById(id).dataset.uploadedPath;
     document.getElementById('preview-' + id).textContent = `→ /files${path} ✓`;
+    if (editBtn) editBtn.style.display = 'inline-flex';
+  } else {
+    if (editBtn) editBtn.style.display = 'none';
+  }
+}
+
+async function uploadAndEditPdf(id, path) {
+  const fileEl = document.getElementById(id);
+  const btn = document.getElementById('edit-btn-' + id);
+  if (!fileEl?.files[0]) return;
+
+  const subj = getSubject(state.activeSubjectId);
+  const level = getLevel(subj, state.activeLevelId);
+  const year = document.getElementById('paper-year')?.value || '0000';
+
+  // Derive upload fields from the field id
+  const typeMap = {
+    'file-paper': 'paper', 'file-paper1': 'paper1', 'file-paper2': 'paper2',
+    'file-jabchem-ms': 'jabchem_ms', 'file-ms': 'ms'
+  };
+  const fileType = typeMap[id] || id.replace('file-', '');
+  const uploadFields = {
+    subject_id: subj.slug, level_id: level.slug,
+    section_id: state.activeSectionId,
+    year: year.toString(), file_type: fileType
+  };
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:12px;height:12px"></div> Uploading…';
+
+  try {
+    const uploadedPath = await uploadFile(fileEl.files[0], uploadFields);
+    // Store the uploaded path so savePaper skips re-uploading
+    fileEl.dataset.uploadedPath = uploadedPath;
+    document.getElementById('preview-' + id).textContent = `→ ${uploadedPath} ✓ (uploaded)`;
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa fa-scissors"></i> Edit PDF';
+    openPdfEditor(uploadedPath);
+  } catch (e) {
+    notify(e.message, 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa fa-scissors"></i> Edit PDF';
   }
 }
 
@@ -1327,7 +1632,14 @@ async function savePaper() {
   closeModal('modal-add-paper');
   renderResourceContent();
   markChanged();
-  notify('Paper saved!', 'success');
+
+  // Offer PDF editor if any PDFs were just uploaded
+  const uploadedPdfs = Object.values(paperData).filter(v => typeof v === 'string' && v.endsWith('.pdf'));
+  if (uploadedPdfs.length) {
+    notifyWithAction('Paper saved!', 'Edit PDF', () => openPdfEditor(uploadedPdfs[0]));
+  } else {
+    notify('Paper saved!', 'success');
+  }
 }
 
 // ── Section item actions ────────────────────────────────────────────────────
@@ -1341,6 +1653,12 @@ function openAddItem() {
   document.getElementById('resource-title').value = '';
   document.getElementById('resource-file').value = '';
   document.getElementById('resource-url').value = '';
+  const isDataBooklet = section?.resourceType === 'dataBooklets';
+  document.getElementById('add-resource-level-group').style.display = isDataBooklet ? '' : 'none';
+  document.getElementById('resource-level').value = '';
+  document.getElementById('add-resource-rel-group').style.display = (isDataBooklet && section?.relationshipBooklet) ? '' : 'none';
+  document.getElementById('resource-rel-file').value = '';
+  document.getElementById('resource-rel-url').value = '';
   openModal('modal-add-resource');
 }
 
@@ -1364,10 +1682,21 @@ async function saveResource() {
     });
   } catch (e) { notify(e.message, 'error'); return; }
 
+  let relPath = null;
+  if (document.getElementById('add-resource-rel-group').style.display !== 'none') {
+    try {
+      const relInput = document.getElementById('resource-rel-file');
+      relPath = await resolveFileField('resource-rel-file', 'resource-rel-url', {
+        subject_id: subj.slug, level_id: level.slug, section_id: section.id,
+        file_type: 'relationship_booklet', custom_name: relInput.files[0]?.name || ''
+      });
+    } catch (e) { notify(e.message, 'error'); return; }
+  }
   const id = title.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now().toString(36);
+  const itemLevel = document.getElementById('resource-level').value || undefined;
   await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections/${section.id}/items`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id, title, file: filePath })
+    body: JSON.stringify({ id, title, file: filePath, ...(itemLevel ? { level: itemLevel } : {}), ...(relPath ? { relationshipBooklet: relPath } : {}) })
   });
 
   state.content = await (await fetch('/api/content')).json();
@@ -1929,6 +2258,8 @@ async function fetchFromUrl(url, fields) {
 async function resolveFileField(fileInputId, urlInputId, uploadFields) {
   const fileEl = document.getElementById(fileInputId);
   const urlEl  = document.getElementById(urlInputId);
+  // If already uploaded via Edit PDF button, use that path directly
+  if (fileEl?.dataset.uploadedPath) return fileEl.dataset.uploadedPath;
   if (fileEl?.files[0]) return await uploadFile(fileEl.files[0], uploadFields);
   const url = urlEl?.value.trim();
   if (url) return await fetchFromUrl(url, uploadFields);
@@ -1953,7 +2284,10 @@ function fileCell(path) {
   const name = path.split('/').pop();
   const ext = name.split('.').pop().toLowerCase();
   const icon = ext === 'pdf' ? 'fa-file-pdf' : (ext === 'png' || ext === 'jpg' || ext === 'jpeg' ? 'fa-file-image' : 'fa-file');
-  return `<a href="${path}" class="file-link" target="_blank"><i class="fa ${icon}"></i> ${name}</a>`;
+  const editBtn = ext === 'pdf'
+    ? `<button class="pdf-edit-btn" onclick="openPdfEditor('${path}')" title="Edit PDF"><i class="fa fa-scissors"></i></button>`
+    : '';
+  return `<span style="display:inline-flex;align-items:center;gap:2px"><a href="${path}" class="file-link" target="_blank"><i class="fa ${icon}"></i> ${name}</a>${editBtn}</span>`;
 }
 
 function statusBadge(paper) {
@@ -2013,6 +2347,13 @@ function notify(msg, type = '') {
   el.textContent = (type === 'success' ? '✓ ' : type === 'error' ? '✕ ' : '') + msg;
   el.className = 'notification show ' + type;
   setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+function notifyWithAction(msg, actionLabel, actionFn) {
+  const el = document.getElementById('notification');
+  el.innerHTML = `<span>✓ ${msg}</span><button onclick="(${actionFn.toString()})()" style="margin-left:12px;padding:2px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.15);color:white;font-size:12px;cursor:pointer;font-family:inherit">${actionLabel}</button>`;
+  el.className = 'notification show success';
+  setTimeout(() => el.classList.remove('show'), 6000);
 }
 
 function getSubject(id) { return state.content?.subjects?.find(s => s.id === id); }
@@ -2165,9 +2506,16 @@ function openSectionSettings(sectionId) {
   document.getElementById('modal-rename-section').dataset.sectionId = sectionId;
 
   const jabchemRow = document.getElementById('rename-jabchem-row');
+  const databookletRow = document.getElementById('rename-databooklet-row');
   const extraDiv = document.getElementById('rename-section-extra');
   const isPaperType = section.resourceType === 'pastPapers' || section.resourceType === 'archive';
   const isCustomTable = section.resourceType === 'customTable';
+  const isDataBooklets = section.resourceType === 'dataBooklets';
+
+  databookletRow.style.display = isDataBooklets ? 'flex' : 'none';
+  if (isDataBooklets) {
+    document.getElementById('rename-section-relationship').checked = !!section.relationshipBooklet;
+  }
 
   jabchemRow.style.display = isPaperType ? 'flex' : 'none';
   if (isPaperType) {
@@ -2220,6 +2568,11 @@ async function saveRenameSection() {
     updates.jabchemMarkingScheme = document.getElementById('rename-section-jabchem').checked;
   }
 
+  const databookletRow = document.getElementById('rename-databooklet-row');
+  if (databookletRow.style.display !== 'none') {
+    updates.relationshipBooklet = document.getElementById('rename-section-relationship').checked;
+  }
+
   if (section?.resourceType === 'customTable') {
     updates.description = document.getElementById('rename-section-desc')?.value || '';
     updates.footnote = document.getElementById('rename-section-footnote')?.value || '';
@@ -2232,6 +2585,22 @@ async function saveRenameSection() {
       const id = existingId || label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') || ('col_' + Date.now());
       return { id, label, type };
     }).filter(Boolean);
+
+    // Migrate rows when a column changes from 'file' to 'files'
+    const oldColumns = section?.columns || [];
+    const fileToFiles = updates.columns
+      .filter(nc => { const oc = oldColumns.find(c => c.id === nc.id); return oc && oc.type === 'file' && nc.type === 'files'; })
+      .map(c => c.id);
+    if (fileToFiles.length > 0 && section?.rows?.length) {
+      updates.rows = section.rows.map(row => {
+        const r = { ...row };
+        for (const colId of fileToFiles) {
+          const val = r[colId];
+          r[colId] = Array.isArray(val) ? val : (val && val.file ? [val] : []);
+        }
+        return r;
+      });
+    }
   }
 
   await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections/${sectionId}`, {
@@ -2376,6 +2745,19 @@ function openEditItem(itemId) {
     : '<span class="missing">No file uploaded</span>';
   document.getElementById('edit-resource-file').value = '';
   document.getElementById('edit-resource-url').value = '';
+  const isDataBookletEdit = section?.resourceType === 'dataBooklets';
+  document.getElementById('edit-resource-level-group').style.display = isDataBookletEdit ? '' : 'none';
+  document.getElementById('edit-resource-level').value = item.level || '';
+  const showRelEdit = isDataBookletEdit && !!section?.relationshipBooklet;
+  document.getElementById('edit-resource-rel-group').style.display = showRelEdit ? '' : 'none';
+  if (showRelEdit) {
+    const relCurrentEl = document.getElementById('edit-resource-rel-current');
+    relCurrentEl.innerHTML = item.relationshipBooklet
+      ? `<a href="${item.relationshipBooklet}" target="_blank" class="file-link"><i class="fa fa-file-pdf"></i> ${item.relationshipBooklet.split('/').pop()}</a>`
+      : '<span class="missing">No file uploaded</span>';
+    document.getElementById('edit-resource-rel-file').value = '';
+    document.getElementById('edit-resource-rel-url').value = '';
+  }
   openModal('modal-edit-resource');
 }
 
@@ -2388,7 +2770,10 @@ async function saveEditResource() {
   const title = document.getElementById('edit-resource-title').value.trim();
   if (!title) { notify('Please enter a title', 'error'); return; }
 
-  const updates = { title };
+  const editLevel = document.getElementById('edit-resource-level-group').style.display !== 'none'
+    ? document.getElementById('edit-resource-level').value || null
+    : undefined;
+  const updates = { title, ...(editLevel !== undefined ? { level: editLevel || null } : {}) };
   try {
     const fileInput = document.getElementById('edit-resource-file');
     const newFile = await resolveFileField('edit-resource-file', 'edit-resource-url', {
@@ -2398,6 +2783,14 @@ async function saveEditResource() {
       custom_name: fileInput.files[0]?.name || ''
     });
     if (newFile) updates.file = newFile;
+    if (document.getElementById('edit-resource-rel-group').style.display !== 'none') {
+      const relInput = document.getElementById('edit-resource-rel-file');
+      const newRel = await resolveFileField('edit-resource-rel-file', 'edit-resource-rel-url', {
+        subject_id: subj.slug, level_id: level.slug, section_id: sectionId,
+        file_type: 'relationship_booklet', custom_name: relInput.files[0]?.name || ''
+      });
+      if (newRel) updates.relationshipBooklet = newRel;
+    }
   } catch (e) { notify(e.message, 'error'); return; }
 
   await fetch(`/api/subjects/${subj.id}/levels/${level.id}/sections/${sectionId}/items/${itemId}`, {
@@ -2602,6 +2995,634 @@ async function moveTableRow(rowId, direction) {
   state.content = await (await fetch('/api/content')).json();
   renderResourceContent();
   markChanged();
+}
+
+boot();
+checkPreviewStatus();
+
+// ── PDF Editor ─────────────────────────────────────────────────────────────
+const pdfState = {
+  sources: { a: null, b: null },  // { pages: [{index, thumb, isBlank}], path }
+  result: [],                      // [{ src:'a'|'b', index, thumb }]
+  allPdfs: null,                   // cached from /api/pdf/list
+};
+
+// Chevron toggle for Source B details element
+document.addEventListener('DOMContentLoaded', () => {
+  const det = document.getElementById('pdf-source-b-details');
+  if (det) det.addEventListener('toggle', () => {
+    const ch = document.getElementById('pdf-b-chevron');
+    if (ch) ch.style.transform = det.open ? 'rotate(90deg)' : 'rotate(0deg)';
+  });
+});
+
+async function openPdfEditor(preloadPath) {
+  // Load file list if not cached
+  if (!pdfState.allPdfs) {
+    const res = await fetch('/api/pdf/list');
+    pdfState.allPdfs = await res.json();
+  }
+
+  // Reset state
+  pdfState.sources = { a: null, b: null };
+  pdfState.result = [];
+
+  // Populate pickers
+  ['a', 'b'].forEach(src => {
+    const sel = document.getElementById(`pdf-${src}-picker`);
+    sel.innerHTML = src === 'a'
+      ? '<option value="">— select a PDF —</option>'
+      : '<option value="">— select a PDF to combine —</option>';
+    pdfState.allPdfs.forEach(group => {
+      const og = document.createElement('optgroup');
+      og.label = group.group || 'root';
+      group.files.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.path;
+        opt.textContent = f.name;
+        og.appendChild(opt);
+      });
+      sel.appendChild(og);
+    });
+    if (preloadPath && src === 'a') {
+      // strip /files/ prefix for matching
+      const rel = preloadPath.replace(/^\/files\//, '');
+      sel.value = rel;
+    }
+    document.getElementById(`pdf-${src}-grid`).innerHTML = '';
+    document.getElementById(`pdf-${src}-count`).textContent = '';
+    document.getElementById(`pdf-${src}-actions`).style.display = 'none';
+  });
+
+  renderResultStrip();
+  pdfSaveModeChanged();
+  openModal('modal-pdf-editor');
+
+  if (preloadPath) {
+    await loadPdfSource('a');
+  }
+}
+
+async function loadPdfSource(src) {
+  const sel = document.getElementById(`pdf-${src}-picker`);
+  const path = sel.value;
+  const grid = document.getElementById(`pdf-${src}-grid`);
+  const countEl = document.getElementById(`pdf-${src}-count`);
+  const actionsEl = document.getElementById(`pdf-${src}-actions`);
+
+  if (!path) {
+    grid.innerHTML = '';
+    countEl.textContent = '';
+    actionsEl.style.display = 'none';
+    pdfState.sources[src] = null;
+    return;
+  }
+
+  grid.innerHTML = '<div class="pdf-loading"><div class="spinner"></div> Loading thumbnails…</div>';
+  countEl.textContent = '';
+  actionsEl.style.display = 'none';
+
+  const res = await fetch(`/api/pdf/thumbnails?path=${encodeURIComponent(path)}`);
+  const data = await res.json();
+  if (data.error) {
+    grid.innerHTML = `<p style="color:var(--danger);font-size:12px">${data.error}</p>`;
+    return;
+  }
+
+  // Store source data — default select all non-blank
+  pdfState.sources[src] = {
+    path,
+    pages: data.pages.map(p => ({ ...p, selected: !p.isBlank })),
+  };
+
+  countEl.textContent = `${data.count} pages`;
+  actionsEl.style.display = 'flex';
+  renderSourceGrid(src);
+  updateSaveMode();
+}
+
+function renderSourceGrid(src) {
+  const grid = document.getElementById(`pdf-${src}-grid`);
+  const source = pdfState.sources[src];
+  if (!source) { grid.innerHTML = ''; return; }
+
+  grid.innerHTML = source.pages.map(p => `
+    <div class="pdf-thumb ${p.selected ? 'selected' : ''} ${p.isBlank ? 'blank-page' : ''}"
+         onclick="togglePageSelect('${src}', ${p.index})" title="Page ${p.index + 1}${p.isBlank ? ' (blank)' : ''}">
+      <img src="${p.thumb}" alt="Page ${p.index + 1}">
+      ${p.isBlank ? '<span class="thumb-badge">blank</span>' : ''}
+      <span class="thumb-num">${p.index + 1}</span>
+    </div>`).join('');
+}
+
+function togglePageSelect(src, index) {
+  const source = pdfState.sources[src];
+  if (!source) return;
+  const page = source.pages.find(p => p.index === index);
+  if (page) page.selected = !page.selected;
+  renderSourceGrid(src);
+}
+
+function selectAllPages(src) {
+  const source = pdfState.sources[src];
+  if (!source) return;
+  source.pages.forEach(p => p.selected = true);
+  renderSourceGrid(src);
+}
+
+function selectNonePages(src) {
+  const source = pdfState.sources[src];
+  if (!source) return;
+  source.pages.forEach(p => p.selected = false);
+  renderSourceGrid(src);
+}
+
+function autoSelectPages(src) {
+  const source = pdfState.sources[src];
+  if (!source) return;
+  source.pages.forEach(p => p.selected = !p.isBlank);
+  renderSourceGrid(src);
+}
+
+function buildResult() {
+  pdfState.result = [];
+  ['a', 'b'].forEach(src => {
+    const source = pdfState.sources[src];
+    if (!source) return;
+    source.pages.filter(p => p.selected).forEach(p => {
+      pdfState.result.push({ src, index: p.index, thumb: p.thumb });
+    });
+  });
+  renderResultStrip();
+}
+
+function renderResultStrip() {
+  const strip = document.getElementById('pdf-result-strip');
+  const countEl = document.getElementById('pdf-result-count');
+
+  if (!pdfState.result.length) {
+    strip.innerHTML = '<p style="font-size:12px;color:var(--text-light);padding:12px 0">Select pages above and click Build, or drag pages here directly.</p>';
+    countEl.textContent = '';
+    return;
+  }
+
+  countEl.textContent = `${pdfState.result.length} pages`;
+  const colours = { a: 'var(--primary)', b: '#1D9E75' };
+
+  strip.innerHTML = pdfState.result.map((p, i) => `
+    <div class="pdf-result-thumb" draggable="true" data-result-idx="${i}"
+         title="Source ${p.src.toUpperCase()} — page ${p.index + 1}">
+      <img src="${p.thumb}" alt="">
+      <span class="thumb-src" style="background:${colours[p.src]}">${p.src.toUpperCase()}</span>
+      <span class="thumb-num">${i + 1}</span>
+      <span class="thumb-remove" onclick="removeResultPage(${i})">×</span>
+    </div>`).join('');
+
+  initResultDragDrop();
+}
+
+function removeResultPage(i) {
+  pdfState.result.splice(i, 1);
+  renderResultStrip();
+}
+
+function initResultDragDrop() {
+  const strip = document.getElementById('pdf-result-strip');
+  let dragged = null;
+
+  strip.querySelectorAll('.pdf-result-thumb').forEach(el => {
+    el.addEventListener('dragstart', () => {
+      dragged = el;
+      setTimeout(() => el.classList.add('dragging'), 0);
+    });
+    el.addEventListener('dragend', () => {
+      el.classList.remove('dragging');
+      strip.querySelectorAll('.pdf-result-thumb').forEach(e => e.classList.remove('drag-over'));
+    });
+    el.addEventListener('dragover', e => {
+      e.preventDefault();
+      strip.querySelectorAll('.pdf-result-thumb').forEach(e => e.classList.remove('drag-over'));
+      if (el !== dragged) el.classList.add('drag-over');
+    });
+    el.addEventListener('drop', e => {
+      e.preventDefault();
+      if (el === dragged) return;
+      const fromIdx = parseInt(dragged.dataset.resultIdx);
+      const toIdx = parseInt(el.dataset.resultIdx);
+      const [moved] = pdfState.result.splice(fromIdx, 1);
+      pdfState.result.splice(toIdx, 0, moved);
+      renderResultStrip();
+    });
+  });
+}
+
+function updateSaveMode() {
+  const sel = document.getElementById('pdf-save-mode');
+  const bOpt = sel.querySelector('option[value="overwrite-b"]');
+  if (bOpt) bOpt.disabled = !pdfState.sources.b;
+}
+
+function pdfSaveModeChanged() {
+  const mode = document.getElementById('pdf-save-mode').value;
+  const pathInput = document.getElementById('pdf-save-path');
+  pathInput.style.display = mode === 'new' ? 'block' : 'none';
+}
+
+async function savePdfEdit() {
+  if (!pdfState.result.length) {
+    notify('Build a result first — select pages and click Build.', 'warning');
+    return;
+  }
+
+  const mode = document.getElementById('pdf-save-mode').value;
+  let outputPath;
+  if (mode === 'overwrite-a') {
+    if (!pdfState.sources.a) { notify('Source A not loaded', 'error'); return; }
+    outputPath = pdfState.sources.a.path;
+  } else if (mode === 'overwrite-b') {
+    if (!pdfState.sources.b) { notify('Source B not loaded', 'error'); return; }
+    outputPath = pdfState.sources.b.path;
+  } else {
+    outputPath = document.getElementById('pdf-save-path').value.trim();
+    if (!outputPath) { notify('Enter a save path', 'warning'); return; }
+  }
+
+  // Group consecutive pages from same source into ranges for efficiency
+  const sources = [];
+  let cur = null;
+  for (const p of pdfState.result) {
+    if (!cur || cur.path !== (pdfState.sources[p.src]?.path)) {
+      cur = { path: pdfState.sources[p.src].path, pages: [] };
+      sources.push(cur);
+    }
+    cur.pages.push(p.index);
+  }
+
+  const btn = document.getElementById('btn-pdf-save');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Saving…';
+
+  const res = await fetch('/api/pdf/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ output: outputPath, sources }),
+  });
+  const data = await res.json();
+
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fa fa-save"></i> Save PDF';
+
+  if (data.error) {
+    notify('Error: ' + data.error, 'error');
+  } else {
+    notify(`PDF saved — ${data.pages} pages`, 'success');
+    pdfState.allPdfs = null; // refresh file list next open
+    closeModal('modal-pdf-editor');
+  }
+}
+
+// ── Watermark ──────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const det = document.getElementById('pdf-watermark-details');
+  if (det) det.addEventListener('toggle', () => {
+    const ch = document.getElementById('pdf-wm-chevron');
+    if (ch) ch.style.transform = det.open ? 'rotate(90deg)' : '';
+  });
+});
+
+async function applyWatermark() {
+  const path = pdfState.sources.a?.path;
+  if (!path) { notify('Load a PDF in Source A first', 'warning'); return; }
+
+  const text = document.getElementById('wm-text').value.trim();
+  if (!text) { notify('Enter watermark text', 'warning'); return; }
+
+  const btn = document.getElementById('btn-wm-apply');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Applying…';
+
+  const res = await fetch('/api/pdf/watermark', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      path,
+      text,
+      colour:   document.getElementById('wm-colour').value,
+      opacity:  parseInt(document.getElementById('wm-opacity').value) / 100,
+      fontSize: parseInt(document.getElementById('wm-size').value),
+      angle:    parseInt(document.getElementById('wm-angle').value),
+    }),
+  });
+  const data = await res.json();
+  btn.disabled = false; btn.innerHTML = '<i class="fa fa-stamp"></i> Apply';
+
+  if (data.error) { notify('Error: ' + data.error, 'error'); return; }
+  notify('Watermark applied!', 'success');
+  // Reload thumbnails so the preview reflects the change
+  await loadPdfSource('a');
+}
+
+function openAnnotateFromEditor() {
+  const path = pdfState.sources.a?.path;
+  if (!path) { notify('Load a PDF in Source A first', 'warning'); return; }
+  openAnnotateModal(path);
+}
+
+// ── Annotation modal ───────────────────────────────────────────────────────
+const annState = {
+  path:        null,
+  page:        0,
+  pageCount:   1,
+  scale:       1.5,
+  tool:        'rect',
+  allAnnots:   {},   // { "0": [...], "1": [...] }
+  drawing:     false,
+  startX:      0,
+  startY:      0,
+  pendingText: null, // { x, y } while text input is open
+};
+
+async function openAnnotateModal(path) {
+  annState.path      = path;
+  annState.page      = 0;
+  annState.allAnnots = {};
+  annState.drawing   = false;
+
+  const name = path.split('/').pop();
+  document.getElementById('ann-filename').textContent = name;
+  document.getElementById('ann-dirty-label').textContent = '';
+
+  // Reset bound flag so listeners are re-attached on fresh open
+  const canvas = document.getElementById('ann-canvas');
+  delete canvas.dataset.bound;
+
+  openModal('modal-pdf-annotate');
+  await annLoadPage(0);  // truly waits for image to load and canvas to be sized
+  annBindCanvas();
+}
+
+function annLoadPage(num) {
+  return new Promise(async (resolve) => {
+    const img     = document.getElementById('ann-page-img');
+    const loading = document.getElementById('ann-page-loading');
+
+    img.style.display     = 'none';
+    loading.style.display = 'flex';
+    // Hide canvas while loading but don't reset its size yet
+    const canvas = document.getElementById('ann-canvas');
+    canvas.style.display = 'none';
+
+    const res  = await fetch(`/api/pdf/page?path=${encodeURIComponent(annState.path)}&page=${num}&scale=${annState.scale}`);
+    const data = await res.json();
+    if (data.error) {
+      notify(data.error, 'error');
+      loading.style.display = 'none';
+      resolve();
+      return;
+    }
+
+    annState.pageCount = data.pageCount;
+    annState.page      = num;
+
+    img.onload = () => {
+      loading.style.display = 'none';
+      img.style.display     = 'block';
+      // Always look up canvas fresh — avoids stale reference after any DOM changes
+      const c       = document.getElementById('ann-canvas');
+      c.width       = img.naturalWidth;
+      c.height      = img.naturalHeight;
+      c.style.width  = img.offsetWidth  + 'px';
+      c.style.height = img.offsetHeight + 'px';
+      c.style.display = 'block';
+      annRedrawCanvas();
+      resolve();
+    };
+    img.src = data.image;
+
+    document.getElementById('ann-page-label').textContent = `Page ${num + 1} / ${data.pageCount}`;
+    document.getElementById('ann-prev').disabled = num === 0;
+    document.getElementById('ann-next').disabled = num === data.pageCount - 1;
+  });
+}
+
+function annChangePage(dir) {
+  const next = annState.page + dir;
+  if (next < 0 || next >= annState.pageCount) return;
+  cancelTextAnnotation();
+  annLoadPage(next);
+}
+
+function setAnnTool(tool) {
+  annState.tool = tool;
+  document.querySelectorAll('.ann-tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+  const canvas = document.getElementById('ann-canvas');
+  canvas.style.cursor = tool === 'text' ? 'text' : 'crosshair';
+  document.getElementById('ann-thickness-row').style.display = tool === 'text'   ? 'none'  : '';
+  document.getElementById('ann-fontsize-row').style.display  = tool === 'text'   ? ''      : 'none';
+}
+
+function annCurrentAnnots() {
+  const key = String(annState.page);
+  if (!annState.allAnnots[key]) annState.allAnnots[key] = [];
+  return annState.allAnnots[key];
+}
+
+function undoAnnotation() {
+  annCurrentAnnots().pop();
+  annRedrawCanvas();
+  annUpdateDirtyLabel();
+}
+
+function clearPageAnnotations() {
+  annState.allAnnots[String(annState.page)] = [];
+  annRedrawCanvas();
+  annUpdateDirtyLabel();
+}
+
+function annUpdateDirtyLabel() {
+  const total = Object.values(annState.allAnnots).reduce((s, a) => s + a.length, 0);
+  document.getElementById('ann-dirty-label').textContent = total > 0 ? `${total} annotation${total > 1 ? 's' : ''} pending` : '';
+}
+
+function annBindCanvas() {
+  const canvas = document.getElementById('ann-canvas');
+  if (canvas.dataset.bound) return; // already bound — don't double-attach
+  canvas.dataset.bound = '1';
+
+  // All handlers look up the canvas live so they're never stale
+  function getCanvas() { return document.getElementById('ann-canvas'); }
+
+  canvas.addEventListener('mousedown', e => {
+    if (annState.tool === 'text') return;
+    annState.drawing = true;
+    const {x, y} = annCanvasPos(e, getCanvas());
+    annState.startX = x; annState.startY = y;
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    if (!annState.drawing) return;
+    const c = getCanvas();
+    const {x, y} = annCanvasPos(e, c);
+    annRedrawCanvas();
+    annDrawLive(c.getContext('2d'), annState.startX, annState.startY, x, y);
+  });
+
+  canvas.addEventListener('mouseup', e => {
+    if (!annState.drawing) return;
+    annState.drawing = false;
+    const {x, y} = annCanvasPos(e, getCanvas());
+    const colour    = document.getElementById('ann-colour').value;
+    const thickness = parseInt(document.getElementById('ann-thickness').value);
+    const dx = Math.abs(x - annState.startX);
+    const dy = Math.abs(y - annState.startY);
+    if (dx < 3 && dy < 3) return;
+    annCurrentAnnots().push({ type: annState.tool, colour, thickness,
+      x1: annState.startX, y1: annState.startY, x2: x, y2: y });
+    annRedrawCanvas();
+    annUpdateDirtyLabel();
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    // Cancel in-progress draw if mouse leaves the canvas
+    if (annState.drawing) {
+      annState.drawing = false;
+      annRedrawCanvas();
+    }
+  });
+
+  canvas.addEventListener('click', e => {
+    if (annState.tool !== 'text') return;
+    const {x, y} = annCanvasPos(e, getCanvas());
+    openTextInput(x, y, getCanvas());
+  });
+
+  window.addEventListener('resize', () => {
+    const img = document.getElementById('ann-page-img');
+    const c   = getCanvas();
+    if (img && c) {
+      c.style.width  = img.offsetWidth  + 'px';
+      c.style.height = img.offsetHeight + 'px';
+    }
+  });
+}
+
+function annCanvasPos(e, canvas) {
+  // canvas param kept for compatibility but we always resolve fresh
+  const c      = document.getElementById('ann-canvas');
+  const rect   = c.getBoundingClientRect();
+  const scaleX = c.width  / rect.width;
+  const scaleY = c.height / rect.height;
+  return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+}
+
+function annRedrawCanvas() {
+  const canvas = document.getElementById('ann-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (const ann of annCurrentAnnots()) {
+    annDrawAnnot(ctx, ann);
+  }
+}
+
+function annDrawLive(ctx, x1, y1, x2, y2) {
+  const colour    = document.getElementById('ann-colour').value;
+  const thickness = parseInt(document.getElementById('ann-thickness').value);
+  annDrawAnnot(ctx, { type: annState.tool, colour, thickness, x1, y1, x2, y2 });
+}
+
+function annDrawAnnot(ctx, ann) {
+  ctx.strokeStyle = ann.colour || '#e63946';
+  ctx.fillStyle   = ann.colour || '#e63946';
+  ctx.lineWidth   = ann.thickness || 2;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+
+  if (ann.type === 'rect') {
+    ctx.strokeRect(ann.x1, ann.y1, ann.x2 - ann.x1, ann.y2 - ann.y1);
+
+  } else if (ann.type === 'arrow') {
+    ctx.beginPath();
+    ctx.moveTo(ann.x1, ann.y1);
+    ctx.lineTo(ann.x2, ann.y2);
+    ctx.stroke();
+    // Arrowhead
+    const angle  = Math.atan2(ann.y2 - ann.y1, ann.x2 - ann.x1);
+    const head   = 14;
+    const spread = 0.45;
+    ctx.beginPath();
+    ctx.moveTo(ann.x2, ann.y2);
+    ctx.lineTo(ann.x2 - head * Math.cos(angle - spread), ann.y2 - head * Math.sin(angle - spread));
+    ctx.moveTo(ann.x2, ann.y2);
+    ctx.lineTo(ann.x2 - head * Math.cos(angle + spread), ann.y2 - head * Math.sin(angle + spread));
+    ctx.stroke();
+
+  } else if (ann.type === 'text' && ann.text) {
+    ctx.font      = `${ann.fontSize || 14}px Inter, sans-serif`;
+    ctx.fillStyle = ann.colour || '#e63946';
+    ctx.fillText(ann.text, ann.x, ann.y);
+
+  } else if (ann.type === 'redact') {
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(ann.x1, ann.y1, ann.x2 - ann.x1, ann.y2 - ann.y1);
+  }
+}
+
+function openTextInput(x, y, canvas) {
+  cancelTextAnnotation();
+  annState.pendingText = { x, y };
+  const wrap  = document.getElementById('ann-text-input-wrap');
+  const input = document.getElementById('ann-text-input');
+  // Position the input overlay at the click point (in CSS px, accounting for canvas scaling)
+  const rect   = canvas.getBoundingClientRect();
+  const cssX   = x * (rect.width  / canvas.width);
+  const cssY   = y * (rect.height / canvas.height);
+  wrap.style.left    = cssX + 'px';
+  wrap.style.top     = (cssY - 20) + 'px';
+  wrap.style.display = 'block';
+  input.value        = '';
+  input.focus();
+}
+
+function commitTextAnnotation() {
+  const input   = document.getElementById('ann-text-input');
+  const text    = input.value.trim();
+  const colour  = document.getElementById('ann-colour').value;
+  const fontSize = parseInt(document.getElementById('ann-fontsize').value) || 14;
+  if (text && annState.pendingText) {
+    annCurrentAnnots().push({ type: 'text', text, colour, fontSize,
+      x: annState.pendingText.x, y: annState.pendingText.y });
+    annRedrawCanvas();
+    annUpdateDirtyLabel();
+  }
+  cancelTextAnnotation();
+}
+
+function cancelTextAnnotation() {
+  annState.pendingText = null;
+  document.getElementById('ann-text-input-wrap').style.display = 'none';
+  document.getElementById('ann-text-input').value = '';
+}
+
+async function saveAnnotations() {
+  const total = Object.values(annState.allAnnots).reduce((s, a) => s + a.length, 0);
+  if (total === 0) { notify('No annotations to save', 'warning'); return; }
+
+  const btn = document.getElementById('btn-ann-save');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Burning…';
+
+  const res = await fetch('/api/pdf/annotate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: annState.path, scale: annState.scale, pages: annState.allAnnots }),
+  });
+  const data = await res.json();
+  btn.disabled = false; btn.innerHTML = '<i class="fa fa-save"></i> Burn annotations';
+
+  if (data.error) { notify('Error: ' + data.error, 'error'); return; }
+  notify('Annotations burned into PDF!', 'success');
+  annState.allAnnots = {};
+  annUpdateDirtyLabel();
+  closeModal('modal-pdf-annotate');
+  // Refresh thumbnails in editor if the same file is loaded
+  if (pdfState.sources.a?.path === annState.path) await loadPdfSource('a');
 }
 
 boot();

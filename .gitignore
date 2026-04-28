@@ -6,10 +6,20 @@ __pycache__/
 *.pyo
 .DS_Store
 
-# The built site is committed (Cloudflare deploys from it)
-# but we exclude it from local tracking if preferred
-# Uncomment the next line to NOT commit the built site:
-# site/
+# Claude Code local settings
+.claude/
+
+# Importer downloaded PDFs (1GB+, not for version control)
+importer/files/
+
+# Live-site repo clone — this is the separate GitHub Pages repo, not part of the CMS
+live-site/
+
+# Temp file from atomic content.json writes
+content/content.tmp
+
+# The built site — ephemeral, rebuilt on each publish
+site/
 
 # Python
 *.egg-info/
