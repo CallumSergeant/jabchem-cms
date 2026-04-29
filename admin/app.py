@@ -844,8 +844,12 @@ def publish():
             cw.set_value('user', 'name', git_name)
             cw.set_value('user', 'email', git_email)
 
-        # Pull latest to avoid conflicts
-        live_repo.remotes.origin.pull(live_branch)
+        # Sync to remote HEAD — fetch then hard reset so local always matches
+        # remote before we wipe and re-copy.  Using reset --hard rather than pull
+        # avoids merge conflicts when the local repo has diverged (e.g. from a
+        # partial previous run).
+        live_repo.remotes.origin.fetch()
+        live_repo.git.reset('--hard', f'origin/{live_branch}')
 
         # 3. Preserve CNAME (GitHub Pages custom domain file)
         cname_file = LIVE_REPO_DIR / 'CNAME'
@@ -872,26 +876,39 @@ def publish():
         if cname is not None:
             cname_file.write_text(cname)
 
-        # 6. Commit and push
+        # 6. Commit if there are changes
         live_repo.git.add(A=True)
         porcelain = live_repo.git.status('--porcelain')
-        live_files = [f.name for f in LIVE_REPO_DIR.iterdir() if f.name != '.git'][:10]
-        site_files = [f.name for f in SITE_DIR.iterdir()][:10] if SITE_DIR.exists() else []
         if porcelain.strip():
             live_repo.index.commit(message)
+
+        # 7. Push if local HEAD is ahead of remote.
+        #    This also catches the case where a previous commit was made locally
+        #    but the push failed, leaving the remote behind.
+        try:
+            ahead = int(live_repo.git.rev_list('--count', f'origin/{live_branch}..HEAD'))
+        except Exception:
+            # If the ref comparison fails, push unconditionally so we don't silently skip
+            ahead = 1
+
+        if ahead > 0:
             live_repo.remotes.origin.push(f'HEAD:{live_branch}')
-            return jsonify({'status': 'ok', 'message': 'Published to GitHub Pages successfully'})
+            verb = 'Published' if porcelain.strip() else 'Pushed pending commits'
+            return jsonify({'status': 'ok', 'message': f'{verb} to GitHub Pages successfully'})
         else:
+            try:
+                git_log = live_repo.git.log('--oneline', '-5')
+            except Exception:
+                git_log = '(unavailable)'
             return jsonify({
                 'status': 'ok',
                 'message': 'Nothing to publish — site is already up to date',
                 'debug': {
                     'porcelain': porcelain,
+                    'ahead': ahead,
+                    'git_log': git_log,
                     'live_repo_dir': str(LIVE_REPO_DIR),
-                    'live_files': live_files,
                     'site_dir': str(SITE_DIR),
-                    'site_files': site_files,
-                    'site_exists': SITE_DIR.exists(),
                 }
             })
 
