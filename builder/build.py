@@ -236,6 +236,24 @@ def build():
     )
     print(f"  ✓ search-index.json ({len(index)} records)")
 
+    # ── Sitemap ────────────────────────────────────────────────────────────────
+    base_url = site.get('baseUrl', '').rstrip('/')
+    urls = ['/']
+    for subj in subjects:
+        urls.append(f'/{subj["slug"]}/')
+        for level in subj.get('levels', []):
+            if level.get('published', True):
+                urls.append(f'/{subj["slug"]}/{level["slug"]}/')
+    if site.get('privacy'):
+        urls.append('/privacy/')
+    sitemap_lines = ['<?xml version="1.0" encoding="UTF-8"?>',
+                     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    for u in urls:
+        sitemap_lines.append(f'  <url><loc>{base_url}{u}</loc></url>')
+    sitemap_lines.append('</urlset>')
+    (SITE_DIR / 'sitemap.xml').write_text('\n'.join(sitemap_lines), encoding='utf-8')
+    print(f"  ✓ sitemap.xml ({len(urls)} URLs)")
+
     print(f"\n✅ Build complete → {SITE_DIR}\n")
     return True
 
