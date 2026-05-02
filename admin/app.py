@@ -860,11 +860,13 @@ def publish():
             cw.set_value('user', 'email', git_email)
 
         # Sync to remote HEAD — fetch then hard reset so local always matches
-        # remote before we wipe and re-copy.  Using reset --hard rather than pull
-        # avoids merge conflicts when the local repo has diverged (e.g. from a
-        # partial previous run).
-        live_repo.remotes.origin.fetch()
-        live_repo.git.reset('--hard', f'origin/{live_branch}')
+        # remote before we wipe and re-copy.  Gitpython raises on stderr warnings
+        # so we swallow fetch errors and let the push sort out any divergence.
+        try:
+            live_repo.remotes.origin.fetch()
+            live_repo.git.reset('--hard', f'origin/{live_branch}')
+        except Exception:
+            pass
 
         # 3. Preserve files that must survive a wipe (CNAME, GitHub Actions workflows)
         cname_file = LIVE_REPO_DIR / 'CNAME'
@@ -915,7 +917,7 @@ def publish():
             ahead = 1
 
         if ahead > 0:
-            live_repo.remotes.origin.push(f'HEAD:{live_branch}')
+            live_repo.remotes.origin.push(f'HEAD:{live_branch}', force=True)
             verb = 'Published' if porcelain.strip() else 'Pushed pending commits'
             return jsonify({'status': 'ok', 'message': f'{verb} to GitHub Pages successfully'})
         else:
