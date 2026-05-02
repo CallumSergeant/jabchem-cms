@@ -2151,11 +2151,16 @@ async function doPublish() {
 
   if (data.status === 'ok') {
     closeModal('modal-publish');
-    state.pendingChanges = 0;
-    updateDeployBar();
-    notify('Pushed to GitHub! Site is building (~30 seconds)', 'success');
+    const pushed = data.message && !data.message.includes('Nothing to publish');
+    if (pushed) {
+      state.pendingChanges = 0;
+      updateDeployBar();
+      notify(data.message + ' — site building (~30s)', 'success');
+    } else {
+      notify(data.message || 'Nothing to publish', 'info');
+    }
   } else {
-    notify('Error: ' + data.message, 'error');
+    notify('Publish failed: ' + data.message, 'error');
   }
 }
 
