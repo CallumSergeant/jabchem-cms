@@ -212,6 +212,11 @@ def build():
         html = tmpl.render(site=site, subjects=subjects, current_path='/privacy/')
         write_page(SITE_DIR / 'privacy' / 'index.html', html)
 
+    # ── 404 page ───────────────────────────────────────────────────────────────
+    tmpl = env.get_template('404.html')
+    html = tmpl.render(site=site, subjects=subjects, current_path='/404')
+    write_page(SITE_DIR / '404.html', html)
+
     # ── Copy files ─────────────────────────────────────────────────────────
     if FILES_DIR.exists():
         dest = SITE_DIR / 'files'
