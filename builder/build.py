@@ -123,7 +123,6 @@ CONTENT_FILE  = BASE_DIR / 'content' / 'content.json'
 FILES_DIR     = BASE_DIR / 'content' / 'files'
 SITE_DIR      = BASE_DIR / 'site'
 TEMPLATES_DIR = Path(__file__).parent / 'templates'
-STATIC_DIR    = Path(__file__).parent / 'static'
 
 
 def load_content():
@@ -229,16 +228,6 @@ def build():
     if assets_src.exists():
         shutil.copytree(assets_src, SITE_DIR / 'assets')
         print(f"  ✓ assets/ copied")
-
-    # ── Copy static files (e.g. .github/workflows) ─────────────────────────
-    if STATIC_DIR.exists():
-        for item in STATIC_DIR.iterdir():
-            dest = SITE_DIR / item.name
-            if item.is_dir():
-                shutil.copytree(item, dest)
-            else:
-                shutil.copy2(item, dest)
-        print(f"  ✓ static/ copied")
 
     # ── Search index ───────────────────────────────────────────────────────────
     index = build_search_index(subjects)

@@ -860,23 +860,15 @@ def publish():
             cw.set_value('user', 'email', git_email)
 
         # Sync to remote HEAD — fetch then hard reset so local always matches
-        # remote before we wipe and re-copy.  Gitpython raises on stderr warnings
-        # so we swallow fetch errors and let the push sort out any divergence.
-        try:
-            live_repo.remotes.origin.fetch()
-            live_repo.git.reset('--hard', f'origin/{live_branch}')
-        except Exception:
-            pass
+        # remote before we wipe and re-copy.  Using reset --hard rather than pull
+        # avoids merge conflicts when the local repo has diverged (e.g. from a
+        # partial previous run).
+        live_repo.remotes.origin.fetch()
+        live_repo.git.reset('--hard', f'origin/{live_branch}')
 
-        # 3. Preserve files that must survive a wipe (CNAME, GitHub Actions workflows)
+        # 3. Preserve CNAME (GitHub Pages custom domain file)
         cname_file = LIVE_REPO_DIR / 'CNAME'
         cname = cname_file.read_text() if cname_file.exists() else None
-
-        github_dir = LIVE_REPO_DIR / '.github'
-        github_backup = None
-        if github_dir.exists():
-            github_backup = Path(tempfile.mkdtemp()) / '.github'
-            shutil.copytree(github_dir, github_backup)
 
         # 4. Clear the live repo contents (leave .git intact)
         for item in LIVE_REPO_DIR.iterdir():
@@ -895,11 +887,9 @@ def publish():
             else:
                 shutil.copy2(item, dest)
 
-        # Restore preserved files
+        # Restore CNAME
         if cname is not None:
             cname_file.write_text(cname)
-        if github_backup is not None:
-            shutil.copytree(github_backup, github_dir)
 
         # 6. Commit if there are changes
         live_repo.git.add(A=True)
@@ -917,7 +907,7 @@ def publish():
             ahead = 1
 
         if ahead > 0:
-            live_repo.remotes.origin.push(f'HEAD:{live_branch}', force=True)
+            live_repo.remotes.origin.push(f'HEAD:{live_branch}')
             verb = 'Published' if porcelain.strip() else 'Pushed pending commits'
             return jsonify({'status': 'ok', 'message': f'{verb} to GitHub Pages successfully'})
         else:
