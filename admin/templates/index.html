@@ -344,13 +344,12 @@
     <span class="changes-count" id="changes-count" style="display:none"></span>
     <div id="preview-indicator" style="display:none;align-items:center;gap:7px;font-size:12px;background:rgba(255,255,255,0.1);padding:4px 12px;border-radius:6px">
       <span style="width:7px;height:7px;border-radius:50%;background:#1D9E75;display:inline-block;animation:pulse 2s infinite"></span>
-      Preview running —
+      Demo site —
       <a id="preview-link" href="#" target="_blank" style="color:white;font-weight:500;text-decoration:underline">open</a>
-      <button onclick="stopPreview()" style="background:none;border:none;color:rgba(255,255,255,0.5);cursor:pointer;font-size:11px;padding:0 0 0 4px">✕ stop</button>
     </div>
     <div class="spacer"></div>
-    <button class="btn-deploy" onclick="openPreviewModal()" style="margin-right:6px;background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.15)">
-      <i class="fa fa-eye"></i> Preview locally
+    <button class="btn-deploy" id="btn-save-changes" onclick="doSaveChanges()" style="margin-right:6px;background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.15)">
+      <i class="fa fa-floppy-disk"></i> Save changes
     </button>
     <button class="btn-deploy" onclick="openPublishModal()">
       <i class="fa fa-rocket"></i> Publish to site
@@ -484,56 +483,16 @@
   </div>
 </div>
 
-<!-- Preview -->
-<div class="modal-overlay" id="modal-preview" style="display:none" onclick="closeModalOutside(event,'modal-preview')">
-  <div class="modal">
-    <div class="modal-header">
-      <h3>Preview site locally</h3>
-      <button class="icon-btn" onclick="closeModal('modal-preview')"><i class="fa fa-times"></i></button>
-    </div>
-    <div class="modal-body">
-      <p style="font-size:13px;color:var(--text-muted);line-height:1.7;margin-bottom:16px">
-        This builds your site from the current content and serves it locally so you can check everything looks right before publishing to GitHub.
-      </p>
-      <div id="preview-modal-state-idle">
-        <div style="background:#f9fafb;border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-size:13px;color:var(--text-muted)">
-          <i class="fa fa-info-circle" style="margin-right:6px"></i>
-          The preview opens in a new browser tab at <code style="background:#f3f4f6;padding:1px 5px;border-radius:4px">http://localhost:5050</code>.
-          It stays live until you stop it or close the admin.
-        </div>
-      </div>
-      <div id="preview-modal-state-building" style="display:none;text-align:center;padding:24px 0">
-        <div class="spinner" style="border-color:rgba(83,74,183,0.2);border-top-color:var(--primary);width:28px;height:28px;border-width:3px;margin:0 auto 12px"></div>
-        <p style="font-size:13px;color:var(--text-muted)">Building site…</p>
-        <pre id="preview-build-log" style="margin-top:12px;font-size:11px;font-family:monospace;background:#f3f4f6;padding:10px;border-radius:6px;text-align:left;max-height:160px;overflow-y:auto;color:var(--text-muted);white-space:pre-wrap"></pre>
-      </div>
-      <div id="preview-modal-state-done" style="display:none">
-        <div style="background:var(--success-light);border:1px solid #9FE1CB;border-radius:var(--radius);padding:14px;display:flex;align-items:center;gap:12px">
-          <i class="fa fa-check-circle" style="color:var(--success);font-size:20px;flex-shrink:0"></i>
-          <div>
-            <p style="font-size:13px;font-weight:500;color:#0f6e56;margin-bottom:3px">Preview is live!</p>
-            <a id="preview-open-link" href="#" target="_blank" style="font-size:13px;color:var(--success);font-weight:500;text-decoration:underline"></a>
-          </div>
-        </div>
-        <p style="font-size:12px;color:var(--text-muted);margin-top:10px">
-          <i class="fa fa-lightbulb" style="margin-right:4px"></i>
-          The preview updates each time you click "Preview locally" — it always reflects your latest content.
-        </p>
-      </div>
-      <div id="preview-modal-state-error" style="display:none">
-        <div style="background:var(--danger-light);border:1px solid #fca5a5;border-radius:var(--radius);padding:14px">
-          <p style="font-size:13px;font-weight:500;color:var(--danger);margin-bottom:6px"><i class="fa fa-exclamation-circle"></i> Build failed</p>
-          <pre id="preview-error-log" style="font-size:11px;font-family:monospace;color:#7f1d1d;white-space:pre-wrap;max-height:140px;overflow-y:auto"></pre>
-        </div>
-      </div>
-    </div>
-    <div class="modal-footer" id="preview-modal-footer">
-      <button class="btn" onclick="closeModal('modal-preview')">Close</button>
-      <button class="btn btn-primary" id="btn-do-preview" onclick="doPreview()">
-        <i class="fa fa-hammer"></i> Build &amp; preview
-      </button>
-    </div>
-  </div>
+<!-- Preview state elements (hidden, referenced by JS) -->
+<div style="display:none">
+  <div id="preview-modal-state-idle"></div>
+  <div id="preview-modal-state-building"></div>
+  <div id="preview-modal-state-done"></div>
+  <div id="preview-modal-state-error"></div>
+  <pre id="preview-build-log"></pre>
+  <pre id="preview-error-log"></pre>
+  <a id="preview-open-link" href="#"></a>
+  <button id="btn-do-preview"></button>
 </div>
 
 <!-- Publish -->
@@ -2130,55 +2089,6 @@ async function saveSiteSettings() {
 }
 
 // ── Preview ────────────────────────────────────────────────────────────────
-function openPreviewModal() {
-  // Reset to idle state
-  setPreviewState('idle');
-  openModal('modal-preview');
-}
-
-function setPreviewState(state, data = {}) {
-  ['idle','building','done','error'].forEach(s => {
-    document.getElementById(`preview-modal-state-${s}`).style.display = s === state ? 'block' : 'none';
-  });
-  const btn = document.getElementById('btn-do-preview');
-  if (state === 'building') {
-    btn.disabled = true;
-    btn.innerHTML = '<div class="spinner"></div> Building…';
-  } else {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fa fa-hammer"></i> Build &amp; preview';
-  }
-  if (state === 'done' && data.url) {
-    const link = document.getElementById('preview-open-link');
-    link.href = data.url;
-    link.textContent = data.url;
-    updatePreviewIndicator(true, data.url);
-  }
-  if (state === 'error' && data.message) {
-    document.getElementById('preview-error-log').textContent = data.message;
-  }
-  if (state === 'building' && data.log !== undefined) {
-    document.getElementById('preview-build-log').textContent = data.log;
-  }
-}
-
-async function doPreview() {
-  setPreviewState('building', { log: 'Starting build…' });
-  try {
-    const res = await fetch('/api/preview', { method: 'POST' });
-    const data = await res.json();
-    if (data.status === 'ok') {
-      setPreviewState('done', { url: data.url });
-      // Auto-open the tab
-      window.open(data.url, '_blank');
-    } else {
-      setPreviewState('error', { message: data.message });
-    }
-  } catch (e) {
-    setPreviewState('error', { message: e.toString() });
-  }
-}
-
 function updatePreviewIndicator(running, url) {
   const ind = document.getElementById('preview-indicator');
   ind.style.display = running ? 'flex' : 'none';
@@ -2187,13 +2097,28 @@ function updatePreviewIndicator(running, url) {
   }
 }
 
-async function stopPreview() {
-  await fetch('/api/preview/stop', { method: 'POST' });
-  updatePreviewIndicator(false);
-  notify('Preview stopped');
+async function doSaveChanges() {
+  const btn = document.getElementById('btn-save-changes');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Building…';
+  try {
+    const res = await fetch('/api/preview', { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      updatePreviewIndicator(true, data.url);
+      notify('Demo site updated!', 'success');
+    } else {
+      notify('Build failed: ' + (data.message || 'Unknown error'), 'error');
+    }
+  } catch (e) {
+    notify('Build failed: ' + e.toString(), 'error');
+  }
+  btn.disabled = false;
+  btn.innerHTML = orig;
 }
 
-// Check if a preview is already running on page load
+// Check if the demo server is already running on page load
 async function checkPreviewStatus() {
   try {
     const res = await fetch('/api/preview/status');

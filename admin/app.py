@@ -36,8 +36,23 @@ _content_lock = threading.Lock()
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
+def _default_content():
+    return {
+        "site": {
+            "title": "JABchem", "tagline": "", "baseUrl": "",
+            "theme": {"navBackground": "#1a1a2e"},
+            "nav": {"subjectOrder": []},
+            "footer": {"text": ""}
+        },
+        "subjects": []
+    }
+
 def read_content():
     with _content_lock:
+        if not CONTENT_FILE.exists():
+            CONTENT_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(CONTENT_FILE, 'w', encoding='utf-8') as f:
+                json.dump(_default_content(), f, indent=2, ensure_ascii=False)
         with open(CONTENT_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
 
@@ -1217,6 +1232,25 @@ def pdf_annotate():
         return jsonify({'status': 'ok'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+def _autostart_preview():
+    """Start the demo preview server automatically on CMS launch."""
+    import time
+    time.sleep(1)  # Let Flask bind its port first
+    if _preview_port() is not None:
+        return
+    _stop_preview()
+    SITE_DIR.mkdir(parents=True, exist_ok=True)
+    port = _find_free_port(PREVIEW_PORT)
+    proc = subprocess.Popen(
+        [sys.executable, str(PREVIEW_SCRIPT), str(SITE_DIR), str(port)],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+    _PREVIEW_PID_FILE.write_text(str(proc.pid))
+    _PREVIEW_PORT_FILE.write_text(str(port))
+
+threading.Thread(target=_autostart_preview, daemon=True).start()
 
 
 if __name__ == '__main__':

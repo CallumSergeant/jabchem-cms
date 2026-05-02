@@ -1,6 +1,10 @@
 # Environment
 .env
 venv/
+
+# User content — never overwrite on pull
+content/content.json
+content/files/
 __pycache__/
 *.pyc
 *.pyo
