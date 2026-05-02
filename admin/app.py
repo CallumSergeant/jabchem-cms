@@ -866,9 +866,15 @@ def publish():
         live_repo.remotes.origin.fetch()
         live_repo.git.reset('--hard', f'origin/{live_branch}')
 
-        # 3. Preserve CNAME (GitHub Pages custom domain file)
+        # 3. Preserve files that must survive a wipe (CNAME, GitHub Actions workflows)
         cname_file = LIVE_REPO_DIR / 'CNAME'
         cname = cname_file.read_text() if cname_file.exists() else None
+
+        github_dir = LIVE_REPO_DIR / '.github'
+        github_backup = None
+        if github_dir.exists():
+            github_backup = Path(tempfile.mkdtemp()) / '.github'
+            shutil.copytree(github_dir, github_backup)
 
         # 4. Clear the live repo contents (leave .git intact)
         for item in LIVE_REPO_DIR.iterdir():
@@ -887,9 +893,11 @@ def publish():
             else:
                 shutil.copy2(item, dest)
 
-        # Restore CNAME
+        # Restore preserved files
         if cname is not None:
             cname_file.write_text(cname)
+        if github_backup is not None:
+            shutil.copytree(github_backup, github_dir)
 
         # 6. Commit if there are changes
         live_repo.git.add(A=True)
