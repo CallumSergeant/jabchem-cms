@@ -3,41 +3,56 @@
 {% block title %}{{ site.title }}{% endblock %}
 {% block description %}{{ site.description }}{% endblock %}
 
-{% block full_width %}
-<div class="home-hero">
-  <div class="home-hero-inner">
-    <h1>{{ site.title }}</h1>
-    <p class="home-hero-sub">{{ site.tagline }}</p>
-    <p class="home-hero-count"><span class="home-hero-num">{{ total_pdfs }}+</span> resources across {{ subjects | selectattr('published') | list | length }} subjects</p>
-  </div>
-</div>
-{% endblock %}
+{% block full_width %}{% endblock %}
 
 {% block extra_styles %}
 <style>
-  .home-hero-btns { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+  /* Home intro heading */
+  .home-intro { margin-bottom: 28px; }
+  .home-intro h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.8px; margin-bottom: 7px; color: #374151; }
+  [data-theme="dark"] .home-intro h1 { color: #e8eaf0; }
+  .home-intro p { font-size: 14.5px; color: var(--text-muted); line-height: 1.6; }
+  .home-intro-count { font-size: 13px !important; color: var(--text-light) !important; margin-top: 4px; }
+  .home-intro-num { font-weight: 700; color: var(--text-muted) !important; }
+
+  /* Match section heading accent to JABchem blue */
+  .section-heading::before { background: #3d6ecf; }
+
+  /* Pastel subject cards */
+  .subject-card { background: var(--card-bg, var(--surface)); border-color: var(--card-border, var(--border)); }
+  .subject-card:hover { background: var(--card-bg-hover, var(--surface)); }
+
+  /* Level pills on subject cards */
+  .card-level-pill { font-size: 11.5px; font-weight: 500; padding: 3px 10px; border-radius: 20px; background: rgba(255,255,255,0.65); color: var(--text-muted); border: 1px solid rgba(0,0,0,0.1); }
+  [data-theme="dark"] .card-level-pill { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); border-color: rgba(255,255,255,0.18); }
+
+  /* Announcement hero (optional) */
+  .home-hero-btns { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
   .hero-btn-primary { display: inline-flex; align-items: center; gap: 7px; padding: 10px 20px; border-radius: 7px; font-size: 14px; font-weight: 600; background: white; color: {{ site.theme.navBackground }}; text-decoration: none; transition: opacity 0.15s; }
   .hero-btn-primary:hover { opacity: 0.9; }
   .hero-btn-secondary { display: inline-flex; align-items: center; gap: 7px; padding: 10px 20px; border-radius: 7px; font-size: 14px; font-weight: 600; background: rgba(255,255,255,0.12); color: white; border: 1.5px solid rgba(255,255,255,0.3); text-decoration: none; transition: background 0.15s; }
   .hero-btn-secondary:hover { background: rgba(255,255,255,0.2); }
-  .feedback-banner { margin-top: 32px; border-radius: var(--radius-xl); padding: 22px 28px; display: flex; align-items: center; gap: 20px; background: linear-gradient(135deg, #1d6fa4 0%, #1a1a2e 100%); position: relative; overflow: hidden; }
-  .feedback-banner::before { content: ''; position: absolute; top: -60%; right: -4%; width: 220px; height: 220px; border-radius: 50%; background: rgba(255,255,255,0.05); pointer-events: none; }
-  .feedback-banner::after { content: ''; position: absolute; bottom: -80%; right: 22%; width: 160px; height: 160px; border-radius: 50%; background: rgba(255,255,255,0.04); pointer-events: none; }
-  .feedback-banner-icon { width: 42px; height: 42px; border-radius: 11px; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px; color: white; }
+
+  /* Feedback banner — solid blue, simpler */
+  .feedback-banner { margin-top: 32px; border-radius: var(--radius-xl); padding: 22px 28px; display: flex; align-items: center; gap: 20px; background: #3d6ecf; }
+  .feedback-banner-icon { width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 17px; color: white; }
   .feedback-banner-body { flex: 1; min-width: 0; }
-  .feedback-banner-body p { font-size: 14px; color: rgba(255,255,255,0.85); line-height: 1.5; margin: 0; }
-  .feedback-banner-link { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 7px; font-size: 13px; font-weight: 600; background: rgba(255,255,255,0.15); color: white; border: 1.5px solid rgba(255,255,255,0.25); text-decoration: none; white-space: nowrap; flex-shrink: 0; transition: background 0.15s; }
-  .feedback-banner-link:hover { background: rgba(255,255,255,0.25); }
+  .feedback-banner-body p { font-size: 14px; color: rgba(255,255,255,0.9); line-height: 1.5; margin: 0; }
+  .feedback-banner-link { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; background: white; color: #3d6ecf; text-decoration: none; white-space: nowrap; flex-shrink: 0; transition: opacity 0.15s; }
+  .feedback-banner-link:hover { opacity: 0.9; }
   @media (max-width: 560px) { .feedback-banner { flex-direction: column; align-items: flex-start; gap: 14px; } }
 </style>
 {% endblock %}
 
 {% block content %}
+<div class="home-intro">
+  <h1>Welcome to JABchem</h1>
+  <p>{{ site.tagline }}</p>
+  <p class="home-intro-count"><span class="home-intro-num">{{ total_pdfs }}</span> resources across {{ subjects | selectattr('published') | list | length }} subjects</p>
+</div>
+
 {% if site.hero and site.hero.published and (site.hero.heading or site.hero.text) %}
-<div class="subject-hero" style="background:{{ site.theme.navBackground }}; margin-bottom:32px">
-  <div class="subject-hero-icon">
-    <i class="fa fa-bullhorn"></i>
-  </div>
+<div class="subject-hero" style="background:#3d6ecf; margin-bottom:32px">
   <h1>{{ site.hero.heading }}</h1>
   {% if site.hero.text %}<p>{{ site.hero.text }}</p>{% endif %}
   {% if site.hero.primaryBtn.label or site.hero.secondaryBtn.label %}
@@ -60,17 +75,17 @@
 <div class="section-heading" id="subjects"><h2>Choose a subject</h2></div>
 <div class="subject-grid">
   {% for s in subjects if s.published %}
-  <a href="/{{ s.slug }}/" class="subject-card" style="--card-accent: {{ s.colour }}">
-    <div class="subject-card-icon" style="background: {{ s.colour }}18">
+  <a href="/{{ s.slug }}/" class="subject-card" style="--card-accent: {{ s.colour }}; background: {{ s.colour }}1a; border-color: {{ s.colour }}30;">
+    <div class="subject-card-icon" style="background: {{ s.colour }}28">
       <i class="fa {{ s.icon.fa }}" style="color: {{ s.colour }}"></i>
     </div>
     <h2>{{ s.title }}</h2>
     <p>{{ s.description }}</p>
     <div class="subject-card-footer">
       {% for level in s.levels if level.published %}
-      <span class="subject-card-tag">{{ level.shortTitle }}</span>
+      <span class="card-level-pill">{{ level.shortTitle }}</span>
       {% endfor %}
-      <span class="subject-card-tag" style="background:{{ s.colour }}18; color:{{ s.colour }}; border-color:{{ s.colour }}30">{{ subject_pdfs[s.slug] }} resources</span>
+      <span class="subject-card-tag" style="background:{{ s.colour }}30; color:{{ s.colour }}; border-color:{{ s.colour }}40; font-weight:600;">{{ subject_pdfs[s.slug] }} resources</span>
     </div>
   </a>
   {% endfor %}

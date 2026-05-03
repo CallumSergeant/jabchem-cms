@@ -63,15 +63,15 @@
             <td><div class="year-cell"><span class="year-badge">{{ paper.year }}</span>{% if paper.label %}<span class="year-label">{{ paper.label }}</span>{% endif %}</div></td>
             {% if subject.paperStructure %}
               {% for part in subject.paperStructure.parts %}
-              <td>{% if paper[part.id] %}<a href="{{ paper[part.id] }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> Paper</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
+              <td>{% if paper[part.id] %}<a href="{{ paper[part.id] }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-file"></i> Paper</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
               {% endfor %}
             {% else %}
-            <td>{% if paper.paper %}<a href="{{ paper.paper }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> Paper</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
+            <td>{% if paper.paper %}<a href="{{ paper.paper }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-file"></i> Paper</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
             {% endif %}
             {% if section.jabchemMarkingScheme != false %}
             <td>{% if paper.jabchemMarkingScheme %}<a href="{{ paper.jabchemMarkingScheme }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-check-circle"></i> JABchem</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
             {% endif %}
-            <td>{% if paper.markingScheme %}<a href="{{ paper.markingScheme }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> SQA</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
+            <td>{% if paper.markingScheme %}<a href="{{ paper.markingScheme }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener"><i class="fa fa-file"></i> SQA</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -110,15 +110,15 @@
                 <td><div class="year-cell"><span class="year-badge">{{ paper.year }}</span>{% if paper.label %}<span class="year-label">{{ paper.label }}</span>{% endif %}</div></td>
                 {% if subject.paperStructure %}
                   {% for part in subject.paperStructure.parts %}
-                  <td>{% if paper[part.id] %}<a href="{{ paper[part.id] }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> Paper</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
+                  <td>{% if paper[part.id] %}<a href="{{ paper[part.id] }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-file"></i> Paper</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
                   {% endfor %}
                 {% else %}
-                <td>{% if paper.paper %}<a href="{{ paper.paper }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> Paper</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
+                <td>{% if paper.paper %}<a href="{{ paper.paper }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-file"></i> Paper</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
                 {% endif %}
                 {% if section.jabchemMarkingScheme != false %}
                 <td>{% if paper.jabchemMarkingScheme %}<a href="{{ paper.jabchemMarkingScheme }}" class="pdf-link" target="_blank" rel="noopener"><i class="fa fa-check-circle"></i> JABchem</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
                 {% endif %}
-                <td>{% if paper.markingScheme %}<a href="{{ paper.markingScheme }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> SQA</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
+                <td>{% if paper.markingScheme %}<a href="{{ paper.markingScheme }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener"><i class="fa fa-file"></i> SQA</a>{% else %}<span class="btn-missing">—</span>{% endif %}</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -151,10 +151,10 @@
               {% set val = row[col.id] if col.id in row else none %}
               {% if col.type == 'text' %}{{ val or '' }}
               {% elif col.type == 'file' %}
-                {% if val and val.file %}<a href="{{ val.file }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> {{ val.label or 'Download' }}</a>{% endif %}
+                {% if val and val.file %}<a href="{{ val.file }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener"><i class="fa fa-file"></i> {{ val.label or 'Download' }}</a>{% endif %}
               {% elif col.type == 'files' %}
                 {% set arr = val if val is sequence and val is not string else ([val] if val else []) %}
-                {% if arr %}<div class="ct-files">{% for f in arr %}{% if f.file %}<a href="{{ f.file }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener"><i class="fa fa-file-pdf"></i> {{ f.label or 'Download' }}</a>{% endif %}{% endfor %}</div>{% endif %}
+                {% if arr %}<div class="ct-files">{% for f in arr %}{% if f.file %}<a href="{{ f.file }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener"><i class="fa fa-file"></i> {{ f.label or 'Download' }}</a>{% endif %}{% endfor %}</div>{% endif %}
               {% endif %}
             </td>
             {% endfor %}
@@ -177,12 +177,12 @@
         <span class="resource-item-title">{{ item.title }}</span>
         {% if item.file %}
         <a href="{{ item.file }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener">
-          <i class="fa fa-file-pdf"></i> {% if rt == 'dataBooklets' %}Data Booklet{% else %}Download{% endif %}
+          <i class="fa fa-file"></i> {% if rt == 'dataBooklets' %}Data Booklet{% else %}Download{% endif %}
         </a>
         {% endif %}
         {% if item.relationshipBooklet %}
         <a href="{{ item.relationshipBooklet }}" class="pdf-link pdf-link-sqa" target="_blank" rel="noopener">
-          <i class="fa fa-file-pdf"></i> Relationship Booklet
+          <i class="fa fa-file"></i> Relationship Booklet
         </a>
         {% endif %}
       </div>

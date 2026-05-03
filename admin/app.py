@@ -797,6 +797,9 @@ def preview_site():
     _PREVIEW_PID_FILE.write_text(str(proc.pid))
     _PREVIEW_PORT_FILE.write_text(str(port))
 
+    # Wait until the server is actually accepting connections before returning
+    _wait_for_port(port)
+
     return jsonify({
         'status': 'ok',
         'port': port,
@@ -1234,14 +1237,31 @@ def pdf_annotate():
         return jsonify({'error': str(e)}), 500
 
 
-def _autostart_preview():
-    """Start the demo preview server automatically on CMS launch."""
+def _wait_for_port(port, timeout=5.0):
+    """Block until the given port accepts connections, or timeout expires."""
     import time
-    time.sleep(1)  # Let Flask bind its port first
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            if s.connect_ex(('127.0.0.1', port)) == 0:
+                return True
+        time.sleep(0.1)
+    return False
+
+
+def _autostart_preview():
+    """Build the site then start the demo preview server automatically on CMS launch."""
+    import time
+    time.sleep(2)  # Let Flask fully bind its port first
     if _preview_port() is not None:
         return
     _stop_preview()
     SITE_DIR.mkdir(parents=True, exist_ok=True)
+    # Build so the demo isn't empty on first load
+    subprocess.run(
+        [sys.executable, str(BUILDER)],
+        capture_output=True, text=True, cwd=str(BASE_DIR)
+    )
     port = _find_free_port(PREVIEW_PORT)
     proc = subprocess.Popen(
         [sys.executable, str(PREVIEW_SCRIPT), str(SITE_DIR), str(port)],

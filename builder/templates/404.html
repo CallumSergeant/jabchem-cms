@@ -327,16 +327,13 @@
   }
 
   function extractFromUrl() {
-    var path = window.location.pathname;
+    var path = decodeURIComponent(window.location.pathname);
     var parts = path.split('/').filter(Boolean);
     var terms = [];
-    parts.forEach(function (p) {
-      p = p.replace(/\.(pdf|html|htm)$/i, '');
-      p.split(/[-_]+/).forEach(function (w) {
-        if (w && w.length > 1 && !terms.includes(w)) terms.push(w);
-      });
-    });
-    // pull any 4-digit year from the full path too
+    // First two segments are subject slug and level slug
+    if (parts[0]) terms.push(parts[0]);
+    if (parts[1]) terms.push(parts[1]);
+    // Pull any 4-digit year from anywhere in the full URL
     var m = path.match(/\b(19|20)\d{2}\b/);
     if (m && !terms.includes(m[0])) terms.push(m[0]);
     return terms.join(' ');
